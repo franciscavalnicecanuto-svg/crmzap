@@ -1,2 +1,2 @@
-# Ignore the separate Express API server
-api/
+# Ignore the separate Express API server (root level only)
+/api/

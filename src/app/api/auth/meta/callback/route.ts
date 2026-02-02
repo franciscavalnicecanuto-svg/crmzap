@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 const META_API_VERSION = 'v18.0'
 const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`
 

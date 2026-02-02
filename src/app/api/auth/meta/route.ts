@@ -7,6 +7,9 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 const META_API_VERSION = 'v18.0'
 
 // These come from environment variables (set in Vercel)
@@ -19,16 +22,32 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const platform = searchParams.get('platform') || 'facebook'
   
-  // Scopes needed for messaging
+  // Scopes for Facebook Pages
+  // Note: pages_messaging requires Messenger product to be enabled in Meta App
+  // Note: instagram_* requires Instagram API product to be enabled
+  const baseScopes = [
+    'pages_show_list',           // List user's pages (always available)
+    'pages_read_engagement',     // Read page data (always available)
+  ]
+  
+  // These scopes require products to be enabled in Meta App Dashboard
+  // Go to: App Dashboard → Add Products → Messenger/Instagram
+  const messengerScopes = [
+    'pages_messaging',           // Send/receive messages (requires Messenger product)
+    'pages_manage_metadata',     // Manage page settings (requires Messenger product)
+  ]
+  
+  const instagramScopes = [
+    'instagram_basic',           // Basic Instagram access
+    'instagram_manage_messages', // Instagram DMs
+  ]
+  
+  // Build scope list based on platform
+  // For now, include all - Meta will ignore unavailable ones in dev mode
   const scopes = [
-    'pages_messaging',           // Send/receive messages
-    'pages_manage_metadata',     // Manage page settings
-    'pages_read_engagement',     // Read page data
-    'pages_show_list',           // List user's pages
-    ...(platform === 'instagram' ? [
-      'instagram_basic',
-      'instagram_manage_messages',
-    ] : []),
+    ...baseScopes,
+    ...messengerScopes,
+    ...(platform === 'instagram' ? instagramScopes : []),
   ].join(',')
 
   // State to track which platform and prevent CSRF
