@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -18,36 +19,85 @@ import {
   WifiOff,
   Plus,
   Settings,
-  Trash2
+  ExternalLink
 } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 import { useLeadsStore } from '@/lib/store'
 import messagingApi, { ChannelType, ChannelStatus } from '@/lib/messaging-api'
 
 // Channel icons and colors
-const channelConfig: Record<ChannelType, { name: string; icon: string; color: string; description: string }> = {
+const channelConfig: Record<ChannelType, { name: string; icon: string; color: string; description: string; hasOAuth?: boolean }> = {
   whatsapp: { name: 'WhatsApp', icon: '💬', color: 'bg-green-500', description: 'Via QR Code' },
   telegram: { name: 'Telegram', icon: '✈️', color: 'bg-blue-500', description: 'Via Bot Token' },
-  facebook: { name: 'Facebook', icon: '📘', color: 'bg-blue-600', description: 'Messenger da Página' },
-  instagram: { name: 'Instagram', icon: '📸', color: 'bg-pink-500', description: 'DMs do perfil Business' },
+  facebook: { name: 'Facebook', icon: '📘', color: 'bg-blue-600', description: 'Messenger da Página', hasOAuth: true },
+  instagram: { name: 'Instagram', icon: '📸', color: 'bg-pink-500', description: 'DMs do perfil Business', hasOAuth: true },
   discord: { name: 'Discord', icon: '🎮', color: 'bg-indigo-500', description: 'Via Bot Token' },
   webchat: { name: 'Webchat', icon: '🌐', color: 'bg-gray-500', description: 'Widget pro seu site' },
 }
 
+interface MetaPage {
+  id: string
+  name: string
+  accessToken: string
+  category?: string
+  instagramAccount?: {
+    id: string
+    username?: string
+  } | null
+}
+
+interface MetaAuthResult {
+  success: boolean
+  platform: 'facebook' | 'instagram'
+  pages: MetaPage[]
+}
+
 export default function ConnectPage() {
+  const searchParams = useSearchParams()
   const { setConnectionState } = useLeadsStore()
   const [channels, setChannels] = useState<ChannelStatus[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [addingChannel, setAddingChannel] = useState<ChannelType | null>(null)
   const [qrCode, setQrCode] = useState<string | null>(null)
+  
+  // Meta OAuth state
+  const [metaPages, setMetaPages] = useState<MetaPage[]>([])
+  const [metaPlatform, setMetaPlatform] = useState<'facebook' | 'instagram'>('facebook')
+  const [showPageSelector, setShowPageSelector] = useState(false)
+  
   const [newChannelConfig, setNewChannelConfig] = useState({
     accountId: '',
     botToken: '',
-    pageId: '',
-    pageAccessToken: '',
-    instagramAccountId: '',
   })
+
+  // Handle Meta OAuth callback
+  useEffect(() => {
+    const metaAuth = searchParams.get('meta_auth')
+    const metaError = searchParams.get('meta_error')
+
+    if (metaError) {
+      setError(decodeURIComponent(metaError))
+      // Clean URL
+      window.history.replaceState({}, '', '/connect')
+    }
+
+    if (metaAuth) {
+      try {
+        const data: MetaAuthResult = JSON.parse(atob(metaAuth))
+        if (data.success && data.pages?.length > 0) {
+          setMetaPages(data.pages)
+          setMetaPlatform(data.platform)
+          setShowPageSelector(true)
+        }
+      } catch (e) {
+        setError('Failed to parse Meta auth data')
+      }
+      // Clean URL
+      window.history.replaceState({}, '', '/connect')
+    }
+  }, [searchParams])
 
   // Fetch channels on mount
   useEffect(() => {
@@ -66,12 +116,10 @@ export default function ConnectPage() {
           return [...prev, status]
         })
         
-        // Update global connection state
         if (status.type === 'whatsapp' && status.connected) {
           setConnectionState('connected')
         }
         
-        // Update QR code
         if (status.qrCode) {
           setQrCode(status.qrCode)
         }
@@ -87,7 +135,63 @@ export default function ConnectPage() {
       const { channels } = await messagingApi.getChannels()
       setChannels(channels)
     } catch (err: any) {
-      setError('Não foi possível conectar ao serviço de mensagens. Verifique se está rodando.')
+      // Service might not be running, that's ok
+      console.log('Service not available')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Start Meta OAuth flow
+  const handleMetaConnect = (platform: 'facebook' | 'instagram') => {
+    window.location.href = `/api/auth/meta?platform=${platform}`
+  }
+
+  // Save selected Meta page
+  const handleSelectMetaPage = async (page: MetaPage) => {
+    try {
+      setLoading(true)
+      
+      // Save to local storage for now (later: save to DB)
+      const savedChannels = JSON.parse(localStorage.getItem('crmzap_channels') || '[]')
+      
+      const newChannel = {
+        type: metaPlatform,
+        accountId: page.id,
+        name: page.name,
+        accessToken: page.accessToken,
+        instagramAccountId: page.instagramAccount?.id,
+        instagramUsername: page.instagramAccount?.username,
+        connected: true,
+        connectedAt: new Date().toISOString(),
+      }
+      
+      // Check if already exists
+      const existingIdx = savedChannels.findIndex(
+        (c: any) => c.type === metaPlatform && c.accountId === page.id
+      )
+      
+      if (existingIdx >= 0) {
+        savedChannels[existingIdx] = newChannel
+      } else {
+        savedChannels.push(newChannel)
+      }
+      
+      localStorage.setItem('crmzap_channels', JSON.stringify(savedChannels))
+      
+      setSuccess(`${metaPlatform === 'facebook' ? 'Facebook' : 'Instagram'} conectado com sucesso!`)
+      setShowPageSelector(false)
+      setMetaPages([])
+      
+      // Update local state
+      setChannels(prev => [...prev.filter(c => !(c.type === metaPlatform && c.accountId === page.id)), {
+        type: metaPlatform,
+        accountId: page.id,
+        connected: true,
+      }])
+      
+    } catch (err: any) {
+      setError(err.message)
     } finally {
       setLoading(false)
     }
@@ -113,25 +217,9 @@ export default function ConnectPage() {
         config.telegram = { botToken: newChannelConfig.botToken }
       }
 
-      if (type === 'facebook' && newChannelConfig.pageId && newChannelConfig.pageAccessToken) {
-        config.facebook = { 
-          pageId: newChannelConfig.pageId,
-          pageAccessToken: newChannelConfig.pageAccessToken,
-        }
-      }
-
-      if (type === 'instagram' && newChannelConfig.pageId && newChannelConfig.pageAccessToken && newChannelConfig.instagramAccountId) {
-        config.instagram = { 
-          pageId: newChannelConfig.pageId,
-          pageAccessToken: newChannelConfig.pageAccessToken,
-          instagramAccountId: newChannelConfig.instagramAccountId,
-        }
-      }
-
       await messagingApi.addChannel(config)
       
       if (type === 'whatsapp') {
-        // Fetch QR code after adding
         const qrResult = await messagingApi.getWhatsAppQR(newChannelConfig.accountId)
         if (qrResult?.qrCode) {
           setQrCode(qrResult.qrCode)
@@ -139,7 +227,7 @@ export default function ConnectPage() {
       }
 
       setAddingChannel(null)
-      setNewChannelConfig({ accountId: '', botToken: '', pageId: '', pageAccessToken: '', instagramAccountId: '' })
+      setNewChannelConfig({ accountId: '', botToken: '' })
       fetchChannels()
     } catch (err: any) {
       setError(err.message)
@@ -153,7 +241,6 @@ export default function ConnectPage() {
       await messagingApi.connect(type, accountId)
       
       if (type === 'whatsapp') {
-        // Poll for QR code
         const qrResult = await messagingApi.getWhatsAppQR(accountId)
         if (qrResult?.qrCode) {
           setQrCode(qrResult.qrCode)
@@ -177,6 +264,28 @@ export default function ConnectPage() {
     }
   }
 
+  // Load saved channels from localStorage
+  useEffect(() => {
+    const savedChannels = JSON.parse(localStorage.getItem('crmzap_channels') || '[]')
+    if (savedChannels.length > 0) {
+      const localChannels = savedChannels.map((c: any) => ({
+        type: c.type,
+        accountId: c.accountId,
+        connected: c.connected,
+      }))
+      setChannels(prev => {
+        // Merge with API channels
+        const merged = [...prev]
+        for (const lc of localChannels) {
+          if (!merged.find(m => m.type === lc.type && m.accountId === lc.accountId)) {
+            merged.push(lc)
+          }
+        }
+        return merged
+      })
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
       {/* Header */}
@@ -185,10 +294,10 @@ export default function ConnectPage() {
           <div className="flex items-center gap-4">
             <Link href="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition">
               <ChevronLeft className="w-4 h-4" />
-              <div className="w-8 h-8 rounded-lg whatsapp-gradient flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center">
                 <MessageCircle className="w-4 h-4 text-white" />
               </div>
-              <span className="font-bold">WhatsZap</span>
+              <span className="font-bold">CRMZap</span>
             </Link>
           </div>
           
@@ -211,13 +320,61 @@ export default function ConnectPage() {
             </p>
           </div>
 
+          {/* Success message */}
+          {success && (
+            <Card className="p-4 mb-6 border-green-500/50 bg-green-500/10">
+              <div className="flex items-center gap-2 text-green-600">
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{success}</span>
+                <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setSuccess(null)}>
+                  ✕
+                </Button>
+              </div>
+            </Card>
+          )}
+
           {/* Error message */}
           {error && (
             <Card className="p-4 mb-6 border-destructive/50 bg-destructive/10">
               <div className="flex items-center gap-2 text-destructive">
                 <AlertCircle className="w-4 h-4" />
                 <span>{error}</span>
+                <Button variant="ghost" size="sm" className="ml-auto" onClick={() => setError(null)}>
+                  ✕
+                </Button>
               </div>
+            </Card>
+          )}
+
+          {/* Meta Page Selector Modal */}
+          {showPageSelector && metaPages.length > 0 && (
+            <Card className="p-6 mb-6">
+              <h3 className="font-semibold mb-4">
+                Selecione a página para conectar ao {metaPlatform === 'facebook' ? 'Facebook Messenger' : 'Instagram'}
+              </h3>
+              <div className="space-y-3">
+                {metaPages.map((page) => (
+                  <div 
+                    key={page.id}
+                    className="flex items-center justify-between p-3 border rounded-lg hover:border-primary/50 cursor-pointer transition"
+                    onClick={() => handleSelectMetaPage(page)}
+                  >
+                    <div>
+                      <div className="font-medium">{page.name}</div>
+                      {page.instagramAccount && (
+                        <div className="text-sm text-muted-foreground">
+                          @{page.instagramAccount.username || page.instagramAccount.id}
+                        </div>
+                      )}
+                      <div className="text-xs text-muted-foreground">{page.category}</div>
+                    </div>
+                    <Button size="sm">Conectar</Button>
+                  </div>
+                ))}
+              </div>
+              <Button variant="outline" className="w-full mt-4" onClick={() => setShowPageSelector(false)}>
+                Cancelar
+              </Button>
             </Card>
           )}
 
@@ -257,6 +414,12 @@ export default function ConnectPage() {
             ) : (
               channels.map((channel) => {
                 const config = channelConfig[channel.type]
+                if (!config) return null
+                
+                // Get saved channel data for name
+                const savedChannels = JSON.parse(localStorage.getItem('crmzap_channels') || '[]')
+                const savedChannel = savedChannels.find((c: any) => c.type === channel.type && c.accountId === channel.accountId)
+                
                 return (
                   <Card key={`${channel.type}-${channel.accountId}`} className="p-4">
                     <div className="flex items-center justify-between">
@@ -265,8 +428,10 @@ export default function ConnectPage() {
                           {config.icon}
                         </div>
                         <div>
-                          <div className="font-medium">{config.name}</div>
-                          <div className="text-sm text-muted-foreground">{channel.accountId}</div>
+                          <div className="font-medium">{savedChannel?.name || config.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {savedChannel?.instagramUsername ? `@${savedChannel.instagramUsername}` : channel.accountId}
+                          </div>
                         </div>
                       </div>
                       
@@ -349,47 +514,6 @@ export default function ConnectPage() {
                       </p>
                     </div>
                   )}
-
-                  {(addingChannel === 'facebook' || addingChannel === 'instagram') && (
-                    <>
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Page ID</label>
-                        <Input 
-                          placeholder="123456789"
-                          value={newChannelConfig.pageId}
-                          onChange={(e) => setNewChannelConfig({ ...newChannelConfig, pageId: e.target.value })}
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          ID da sua página do Facebook
-                        </p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium mb-1 block">Page Access Token</label>
-                        <Input 
-                          type="password"
-                          placeholder="EAAxxxxxx..."
-                          value={newChannelConfig.pageAccessToken}
-                          onChange={(e) => setNewChannelConfig({ ...newChannelConfig, pageAccessToken: e.target.value })}
-                        />
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Token de acesso da página (obtido via Meta Business)
-                        </p>
-                      </div>
-                      {addingChannel === 'instagram' && (
-                        <div>
-                          <label className="text-sm font-medium mb-1 block">Instagram Account ID</label>
-                          <Input 
-                            placeholder="17841400000000"
-                            value={newChannelConfig.instagramAccountId}
-                            onChange={(e) => setNewChannelConfig({ ...newChannelConfig, instagramAccountId: e.target.value })}
-                          />
-                          <p className="text-xs text-muted-foreground mt-1">
-                            ID da conta Instagram Business conectada
-                          </p>
-                        </div>
-                      )}
-                    </>
-                  )}
                   
                   <div className="flex gap-2">
                     <Button 
@@ -413,23 +537,35 @@ export default function ConnectPage() {
               <div className="grid grid-cols-2 gap-4">
                 {(['whatsapp', 'telegram', 'facebook', 'instagram', 'webchat'] as ChannelType[]).map((type) => {
                   const config = channelConfig[type]
+                  const hasOAuth = config.hasOAuth
+                  
                   return (
                     <Card 
                       key={type}
                       className="p-4 cursor-pointer hover:border-primary/50 transition"
-                      onClick={() => setAddingChannel(type)}
+                      onClick={() => {
+                        if (hasOAuth) {
+                          handleMetaConnect(type as 'facebook' | 'instagram')
+                        } else {
+                          setAddingChannel(type)
+                        }
+                      }}
                     >
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-lg ${config.color} flex items-center justify-center text-xl`}>
                           {config.icon}
                         </div>
-                        <div>
+                        <div className="flex-1">
                           <div className="font-medium">{config.name}</div>
                           <div className="text-xs text-muted-foreground">
                             {config.description}
                           </div>
                         </div>
-                        <Plus className="w-4 h-4 ml-auto text-muted-foreground" />
+                        {hasOAuth ? (
+                          <ExternalLink className="w-4 h-4 text-muted-foreground" />
+                        ) : (
+                          <Plus className="w-4 h-4 text-muted-foreground" />
+                        )}
                       </div>
                     </Card>
                   )
@@ -438,15 +574,16 @@ export default function ConnectPage() {
             )}
           </div>
 
-          {/* Service Info */}
+          {/* Info Card */}
           <Card className="mt-8 p-4 bg-muted/50">
             <div className="flex items-start gap-3">
               <Settings className="w-5 h-5 text-muted-foreground mt-0.5" />
               <div>
-                <h3 className="font-medium text-sm">Serviço de Mensagens</h3>
+                <h3 className="font-medium text-sm">Sobre as integrações</h3>
                 <p className="text-xs text-muted-foreground mt-1">
-                  O serviço de mensagens precisa estar rodando para conectar os canais.
-                  Execute: <code className="bg-background px-1 rounded">npm run dev</code> em <code className="bg-background px-1 rounded">whatszap-messaging/</code>
+                  <strong>Facebook/Instagram:</strong> Clique no botão e autorize o acesso à sua página. Tudo automático!<br/>
+                  <strong>WhatsApp:</strong> Escaneie o QR Code com seu celular.<br/>
+                  <strong>Telegram:</strong> Crie um bot com @BotFather e cole o token.
                 </p>
               </div>
             </div>
