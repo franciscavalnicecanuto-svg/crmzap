@@ -147,26 +147,45 @@ function ConnectPageContent() {
     window.location.href = `/api/auth/meta?platform=${platform}`
   }
 
-  // Save selected Meta page
+  // Save selected Meta page - Creates inbox in Chatwoot automatically
   const handleSelectMetaPage = async (page: MetaPage) => {
     try {
       setLoading(true)
+      setError(null)
       
-      // Save to local storage for now (later: save to DB)
+      // Create inbox in Chatwoot via our API
+      const response = await fetch('/api/channels/meta/connect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: metaPlatform,
+          pageId: page.id,
+          pageName: page.name,
+          accessToken: page.accessToken,
+          instagramAccountId: page.instagramAccount?.id,
+          instagramUsername: page.instagramAccount?.username,
+        }),
+      })
+      
+      const result = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Falha ao conectar canal')
+      }
+      
+      // Also save to localStorage for quick UI access
       const savedChannels = JSON.parse(localStorage.getItem('crmzap_channels') || '[]')
-      
       const newChannel = {
         type: metaPlatform,
         accountId: page.id,
         name: page.name,
-        accessToken: page.accessToken,
+        inboxId: result.inbox?.id,
         instagramAccountId: page.instagramAccount?.id,
         instagramUsername: page.instagramAccount?.username,
         connected: true,
         connectedAt: new Date().toISOString(),
       }
       
-      // Check if already exists
       const existingIdx = savedChannels.findIndex(
         (c: any) => c.type === metaPlatform && c.accountId === page.id
       )
@@ -179,7 +198,7 @@ function ConnectPageContent() {
       
       localStorage.setItem('crmzap_channels', JSON.stringify(savedChannels))
       
-      setSuccess(`${metaPlatform === 'facebook' ? 'Facebook' : 'Instagram'} conectado com sucesso!`)
+      setSuccess(result.message || `${metaPlatform === 'facebook' ? 'Facebook' : 'Instagram'} conectado com sucesso!`)
       setShowPageSelector(false)
       setMetaPages([])
       
