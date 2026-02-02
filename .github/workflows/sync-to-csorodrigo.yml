@@ -11,10 +11,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - name: Push to csorodrigo
-        env:
-          TOKEN: ${{ secrets.TARGET_REPO_TOKEN }}
-        run: |
-          git remote add target "https://x-access-token:${TOKEN}@github.com/csorodrigo/crmzap.git"
-          git push target main --force
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.TARGET_REPO_TOKEN }}
+          repository: csorodrigo/crmzap
+          branch: main
+          force: true
