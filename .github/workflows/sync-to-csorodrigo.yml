@@ -1,21 +1,12 @@
-name: Sync to csorodrigo
+name: Deploy to Vercel
 
 on:
   push:
     branches: [main]
 
 jobs:
-  sync:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Push to csorodrigo
-        uses: ad-m/github-push-action@master
-        with:
-          github_token: ${{ secrets.TARGET_REPO_TOKEN }}
-          repository: csorodrigo/crmzap
-          branch: main
-          force: true
+      - name: Trigger Vercel Deploy
+        run: curl -X POST "${{ secrets.VERCEL_DEPLOY_HOOK }}"
