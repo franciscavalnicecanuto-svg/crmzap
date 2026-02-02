@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -52,7 +52,7 @@ interface MetaAuthResult {
   pages: MetaPage[]
 }
 
-export default function ConnectPage() {
+function ConnectPageContent() {
   const searchParams = useSearchParams()
   const { setConnectionState } = useLeadsStore()
   const [channels, setChannels] = useState<ChannelStatus[]>([])
@@ -591,5 +591,18 @@ export default function ConnectPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// Wrapper with Suspense for useSearchParams
+export default function ConnectPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    }>
+      <ConnectPageContent />
+    </Suspense>
   )
 }
