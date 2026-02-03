@@ -336,8 +336,8 @@ export default function Dashboard() {
 
       {/* Kanban Board */}
       {leads.length > 0 && (
-        <div className="flex-1 overflow-x-auto p-2">
-          <div className="flex gap-2 h-full min-w-max">
+        <div className="flex-1 overflow-x-auto p-2 pb-4">
+          <div className="flex gap-2 h-full" style={{ minWidth: 'max-content', paddingRight: '8px' }}>
             {statusOrder.map((status) => {
               const config = statusConfig[status]
               const statusLeads = getLeadsByStatus(status)
@@ -345,7 +345,7 @@ export default function Dashboard() {
               return (
                 <div 
                   key={status}
-                  className="flex-shrink-0 w-48 flex flex-col"
+                  className="flex-shrink-0 w-44 flex flex-col"
                   onDragOver={handleDragOver}
                   onDrop={(e) => handleDrop(e, status)}
                 >
