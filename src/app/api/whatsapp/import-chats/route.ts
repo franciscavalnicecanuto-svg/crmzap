@@ -6,13 +6,16 @@ const INSTANCE_NAME = process.env.EVOLUTION_INSTANCE_NAME || 'crmzap'
 
 export async function POST() {
   try {
-    // Get all chats from Evolution API
+    // Get all chats from Evolution API (POST request)
     const response = await fetch(
       `${EVOLUTION_API_URL}/chat/findChats/${INSTANCE_NAME}`,
       {
+        method: 'POST',
         headers: {
           'apikey': EVOLUTION_API_KEY,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({}),
         cache: 'no-store',
       }
     )
