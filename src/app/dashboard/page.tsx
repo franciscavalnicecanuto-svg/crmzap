@@ -58,7 +58,8 @@ export default function Dashboard() {
     selectedLeadId,
     selectLead,
     connectionState,
-    setConnectionState
+    setConnectionState,
+    syncFromWhatsApp
   } = useLeadsStore()
   const [search, setSearch] = useState('')
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
@@ -69,8 +70,6 @@ export default function Dashboard() {
   const [detailLead, setDetailLead] = useState<Lead | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
-
-  const { syncFromWhatsApp } = useLeadsStore()
 
   // Import contacts from WhatsApp
   const importFromWhatsApp = async () => {
@@ -89,6 +88,11 @@ export default function Dashboard() {
         }))
         syncFromWhatsApp(contacts)
         console.log(`Imported ${contacts.length} contacts from WhatsApp`)
+        
+        // Force page reload to ensure state is updated
+        setTimeout(() => {
+          window.location.reload()
+        }, 500)
       } else {
         setImportError(data.error || 'Falha ao importar contatos')
       }
