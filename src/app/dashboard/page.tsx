@@ -29,7 +29,9 @@ import {
   MessageSquare,
   X,
   PanelRightClose,
-  PanelRightOpen
+  PanelRightOpen,
+  Download,
+  Loader2
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -65,6 +67,37 @@ export default function Dashboard() {
   const [mounted, setMounted] = useState(false)
   const [showChat, setShowChat] = useState(true)
   const [detailLead, setDetailLead] = useState<Lead | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
+
+  const { syncFromWhatsApp } = useLeadsStore()
+
+  // Import contacts from WhatsApp
+  const importFromWhatsApp = async () => {
+    setIsImporting(true)
+    setImportError(null)
+    try {
+      const res = await fetch('/api/whatsapp/import-chats', { method: 'POST' })
+      const data = await res.json()
+      
+      if (data.success && data.leads) {
+        // Transform to format expected by syncFromWhatsApp
+        const contacts = data.leads.map((lead: any) => ({
+          phone: lead.phone,
+          name: lead.name,
+          whatsappId: lead.whatsappId,
+        }))
+        syncFromWhatsApp(contacts)
+        console.log(`Imported ${contacts.length} contacts from WhatsApp`)
+      } else {
+        setImportError(data.error || 'Falha ao importar contatos')
+      }
+    } catch (err: any) {
+      setImportError(err.message || 'Erro ao importar')
+    } finally {
+      setIsImporting(false)
+    }
+  }
 
   // Check WhatsApp connection status
   useEffect(() => {
@@ -91,10 +124,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     setMounted(true)
-    // Add demo data if empty
-    if (leads.length === 0) {
-      demoLeads.forEach(lead => addLead(lead))
-    }
   }, [])
 
   if (!mounted) {
@@ -218,6 +247,24 @@ export default function Dashboard() {
                 </Button>
               )}
               
+              {connectionState === 'connected' && (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={importFromWhatsApp}
+                  disabled={isImporting}
+                >
+                  {isImporting ? (
+                    <Loader2 className="w-4 h-4 animate-spin sm:mr-1" />
+                  ) : (
+                    <Download className="w-4 h-4 sm:mr-1" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {isImporting ? 'Importando...' : 'Importar Contatos'}
+                  </span>
+                </Button>
+              )}
+              
               <Dialog open={isAddingLead} onOpenChange={setIsAddingLead}>
                 <DialogTrigger asChild>
                   <Button size="sm" className="whatsapp-gradient text-white hover:opacity-90">
@@ -327,7 +374,64 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Import Error Alert */}
+        {importError && (
+          <div className="bg-red-50 border-b border-red-200 px-4 py-2">
+            <div className="flex items-center gap-3 text-sm">
+              <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+              <span className="text-red-800">{importError}</span>
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="ml-auto text-red-600 hover:text-red-800"
+                onClick={() => setImportError(null)}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Empty State */}
+        {leads.length === 0 && (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <div className="text-center max-w-md">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
+                <MessageCircle className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h2 className="text-xl font-semibold mb-2">Nenhum lead ainda</h2>
+              <p className="text-muted-foreground mb-6">
+                {connectionState === 'connected' 
+                  ? 'Importe seus contatos do WhatsApp para começar a gerenciar seus leads.'
+                  : 'Conecte seu WhatsApp primeiro para importar seus contatos.'}
+              </p>
+              {connectionState === 'connected' ? (
+                <Button 
+                  onClick={importFromWhatsApp}
+                  disabled={isImporting}
+                  className="whatsapp-gradient text-white"
+                >
+                  {isImporting ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  {isImporting ? 'Importando...' : 'Importar Contatos do WhatsApp'}
+                </Button>
+              ) : (
+                <Link href="/connect">
+                  <Button className="whatsapp-gradient text-white">
+                    <Wifi className="w-4 h-4 mr-2" />
+                    Conectar WhatsApp
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Kanban Board */}
+        {leads.length > 0 && (
         <div className="flex-1 overflow-x-auto p-4">
           <div className="flex gap-3 h-full min-w-max">
             {statusOrder.map((status) => {
@@ -437,6 +541,7 @@ export default function Dashboard() {
             })}
           </div>
         </div>
+        )}
       </div>
       
       {/* Chat Panel */}
