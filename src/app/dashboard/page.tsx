@@ -55,7 +55,8 @@ export default function Dashboard() {
     getPendingFollowUps,
     selectedLeadId,
     selectLead,
-    connectionState 
+    connectionState,
+    setConnectionState
   } = useLeadsStore()
   const [search, setSearch] = useState('')
   const [draggedLead, setDraggedLead] = useState<Lead | null>(null)
@@ -64,6 +65,29 @@ export default function Dashboard() {
   const [mounted, setMounted] = useState(false)
   const [showChat, setShowChat] = useState(true)
   const [detailLead, setDetailLead] = useState<Lead | null>(null)
+
+  // Check WhatsApp connection status
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const res = await fetch('/api/whatsapp/status')
+        const data = await res.json()
+        if (data.connected || data.state === 'open') {
+          setConnectionState('connected')
+        } else if (data.state === 'connecting') {
+          setConnectionState('connecting')
+        } else {
+          setConnectionState('disconnected')
+        }
+      } catch (err) {
+        console.error('Failed to check WhatsApp status:', err)
+      }
+    }
+    
+    checkConnection()
+    const interval = setInterval(checkConnection, 30000) // Check every 30s
+    return () => clearInterval(interval)
+  }, [setConnectionState])
 
   useEffect(() => {
     setMounted(true)
