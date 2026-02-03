@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 
 export type LeadStatus = 'novo' | 'em_contato' | 'negociando' | 'fechado' | 'perdido'
 
@@ -58,7 +57,6 @@ interface LeadsState {
 }
 
 export const useLeadsStore = create<LeadsState>()(
-  persist(
     (set, get) => ({
       leads: [],
       selectedLeadId: null,
@@ -191,11 +189,7 @@ export const useLeadsStore = create<LeadsState>()(
         
         return { leads: updatedLeads }
       }),
-    }),
-    {
-      name: 'whatszap-leads',
-    }
-  )
+    })
 )
 
 // Demo data for first-time users
