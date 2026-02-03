@@ -22,32 +22,34 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const platform = searchParams.get('platform') || 'facebook'
   
-  // Scopes for Facebook Pages
-  // Note: pages_messaging requires Messenger product to be enabled in Meta App
-  // Note: instagram_* requires Instagram API product to be enabled
+  // Check if advanced scopes should be requested
+  // Set META_APP_APPROVED=true in env when app passes App Review
+  const isAppApproved = process.env.META_APP_APPROVED === 'true'
+  
+  // Base scopes - always work without App Review
   const baseScopes = [
-    'pages_show_list',           // List user's pages (always available)
-    'pages_read_engagement',     // Read page data (always available)
+    'pages_show_list',           // List user's pages
+    'pages_read_engagement',     // Read page engagement data
+    'public_profile',            // Basic profile info
   ]
   
-  // These scopes require products to be enabled in Meta App Dashboard
-  // Go to: App Dashboard → Add Products → Messenger/Instagram
-  const messengerScopes = [
-    'pages_messaging',           // Send/receive messages (requires Messenger product)
-    'pages_manage_metadata',     // Manage page settings (requires Messenger product)
-  ]
+  // Messenger scopes - require App Review OR user must be app admin/tester
+  // For development: Add user as Tester in Meta App Dashboard > Roles
+  const messengerScopes = isAppApproved ? [
+    'pages_messaging',           // Send/receive messages
+    'pages_manage_metadata',     // Manage page settings
+  ] : []
   
-  const instagramScopes = [
-    'instagram_basic',           // Basic Instagram access
-    'instagram_manage_messages', // Instagram DMs
-  ]
+  // Instagram scopes - require separate Instagram API setup
+  const instagramScopes = (platform === 'instagram' && isAppApproved) ? [
+    'instagram_basic',
+    'instagram_manage_messages',
+  ] : []
   
-  // Build scope list based on platform
-  // For now, include all - Meta will ignore unavailable ones in dev mode
   const scopes = [
     ...baseScopes,
     ...messengerScopes,
-    ...(platform === 'instagram' ? instagramScopes : []),
+    ...instagramScopes,
   ].join(',')
 
   // State to track which platform and prevent CSRF
