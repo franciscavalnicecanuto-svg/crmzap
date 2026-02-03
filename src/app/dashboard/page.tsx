@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { ChatPanel } from '@/components/chat-panel'
 import { 
   MessageCircle, 
   Search,
@@ -14,7 +15,9 @@ import {
   WifiOff,
   Download,
   Loader2,
-  ExternalLink
+  ExternalLink,
+  PanelRightClose,
+  PanelRightOpen
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -30,7 +33,7 @@ interface Lead {
   whatsappId?: string
 }
 
-// Ícones das plataformas (SVG inline para não depender de pacotes externos)
+// Ícones das plataformas
 const SourceIcon = ({ source, className = "w-3.5 h-3.5" }: { source: LeadSource; className?: string }) => {
   switch (source) {
     case 'whatsapp':
@@ -79,6 +82,8 @@ export default function Dashboard() {
   const [isImporting, setIsImporting] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
+  const [showChat, setShowChat] = useState(true)
 
   // Load leads from localStorage on mount
   useEffect(() => {
@@ -126,7 +131,6 @@ export default function Dashboard() {
       const data = await res.json()
       
       if (data.success && data.leads) {
-        // Limit to 200 contacts
         const newLeads: Lead[] = data.leads.slice(0, 200).map((lead: any) => ({
           id: `wa_${lead.phone}`,
           name: lead.name || lead.phone,
@@ -173,9 +177,9 @@ export default function Dashboard() {
     e.preventDefault()
   }
 
-  const openWhatsApp = (phone: string) => {
-    const cleanPhone = phone.replace(/\D/g, '')
-    window.open(`https://wa.me/${cleanPhone}`, '_blank')
+  const handleCardClick = (lead: Lead) => {
+    setSelectedLead(lead)
+    setShowChat(true)
   }
 
   if (!mounted) {
@@ -195,162 +199,150 @@ export default function Dashboard() {
     filteredLeads.filter(lead => lead.status === status)
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 backdrop-blur-lg bg-background/80 border-b border-border/50">
-        <div className="px-3 h-14 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="flex items-center gap-2 hover:opacity-80 transition">
-              <div className="w-7 h-7 rounded-lg bg-green-500 flex items-center justify-center">
-                <MessageCircle className="w-3.5 h-3.5 text-white" />
-              </div>
-              <span className="font-bold text-sm hidden sm:inline">WhatsZap</span>
-            </Link>
-          </div>
-          
-          <div className="flex-1 max-w-sm">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              <Input 
-                placeholder="Buscar..." 
-                className="pl-8 h-8 text-sm"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+    <div className="min-h-screen bg-background flex">
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Header */}
+        <header className="sticky top-0 z-50 backdrop-blur-lg bg-background/80 border-b border-border/50">
+          <div className="px-3 h-12 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Link href="/" className="flex items-center gap-1.5 hover:opacity-80 transition">
+                <div className="w-6 h-6 rounded-md bg-green-500 flex items-center justify-center">
+                  <MessageCircle className="w-3 h-3 text-white" />
+                </div>
+                <span className="font-bold text-sm hidden sm:inline">WhatsZap</span>
+              </Link>
             </div>
-          </div>
-          
-          <div className="flex items-center gap-1.5">
-            <Link href="/connect">
-              <Button 
-                variant={isConnected ? 'outline' : 'default'}
-                size="sm"
-                className={`h-8 text-xs ${isConnected ? 'border-green-500 text-green-600' : 'bg-green-500 text-white'}`}
-              >
-                {isConnected ? (
-                  <>
-                    <Wifi className="w-3.5 h-3.5 mr-1" />
-                    <span className="hidden sm:inline">Conectado</span>
-                  </>
-                ) : (
-                  <>
-                    <WifiOff className="w-3.5 h-3.5 mr-1" />
-                    <span className="hidden sm:inline">Conectar</span>
-                  </>
-                )}
-              </Button>
-            </Link>
             
-            {isConnected && (
-              <Button 
-                size="sm" 
-                variant="outline"
-                className="h-8 text-xs"
-                onClick={importFromWhatsApp}
-                disabled={isImporting}
-              >
-                {isImporting ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin sm:mr-1" />
-                ) : (
-                  <Download className="w-3.5 h-3.5 sm:mr-1" />
-                )}
-                <span className="hidden sm:inline">
-                  {isImporting ? 'Importando...' : 'Importar'}
-                </span>
-              </Button>
-            )}
-          </div>
-        </div>
-      </header>
-
-      {/* Import Error */}
-      {importError && (
-        <div className="bg-red-50 border-b border-red-200 px-3 py-1.5 text-xs text-red-800">
-          {importError}
-        </div>
-      )}
-
-      {/* Stats Bar */}
-      <div className="border-b border-border/50 bg-muted/30 px-3 py-2">
-        <div className="flex items-center gap-4 text-xs">
-          <div>
-            <div className="text-muted-foreground">Total</div>
-            <div className="font-bold">{leads.length}</div>
-          </div>
-          <div className="h-6 w-px bg-border" />
-          <div>
-            <div className="text-muted-foreground">Novos</div>
-            <div className="font-bold text-blue-600">{getLeadsByStatus('novo').length}</div>
-          </div>
-          <div className="h-6 w-px bg-border" />
-          <div>
-            <div className="text-muted-foreground">Negociando</div>
-            <div className="font-bold text-purple-600">{getLeadsByStatus('negociando').length}</div>
-          </div>
-          <div className="h-6 w-px bg-border" />
-          <div>
-            <div className="text-muted-foreground">Fechados</div>
-            <div className="font-bold text-green-600">{getLeadsByStatus('fechado').length}</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Empty State */}
-      {leads.length === 0 && (
-        <div className="flex-1 flex items-center justify-center p-6 min-h-[60vh]">
-          <div className="text-center max-w-sm">
-            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mx-auto mb-3">
-              <MessageCircle className="w-6 h-6 text-muted-foreground" />
+            <div className="flex-1 max-w-xs">
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                <Input 
+                  placeholder="Buscar..." 
+                  className="pl-7 h-7 text-xs"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+              </div>
             </div>
-            <h2 className="text-lg font-semibold mb-1.5">Nenhum lead ainda</h2>
-            <p className="text-muted-foreground text-sm mb-4">
-              {isConnected 
-                ? 'Clique em "Importar" para trazer seus contatos.'
-                : 'Conecte seu WhatsApp primeiro.'}
-            </p>
-            {isConnected ? (
-              <Button 
-                onClick={importFromWhatsApp}
-                disabled={isImporting}
-                size="sm"
-                className="bg-green-500 hover:bg-green-600 text-white"
-              >
-                {isImporting ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
-                ) : (
-                  <Download className="w-3.5 h-3.5 mr-1.5" />
-                )}
-                {isImporting ? 'Importando...' : 'Importar Contatos'}
-              </Button>
-            ) : (
+            
+            <div className="flex items-center gap-1">
               <Link href="/connect">
-                <Button size="sm" className="bg-green-500 hover:bg-green-600 text-white">
-                  <Wifi className="w-3.5 h-3.5 mr-1.5" />
-                  Conectar WhatsApp
+                <Button 
+                  variant={isConnected ? 'outline' : 'default'}
+                  size="sm"
+                  className={`h-7 text-xs px-2 ${isConnected ? 'border-green-500 text-green-600' : 'bg-green-500 text-white'}`}
+                >
+                  {isConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
                 </Button>
               </Link>
-            )}
+              
+              {isConnected && (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  className="h-7 text-xs px-2"
+                  onClick={importFromWhatsApp}
+                  disabled={isImporting}
+                >
+                  {isImporting ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Download className="w-3 h-3" />
+                  )}
+                </Button>
+              )}
+
+              <Button 
+                variant="ghost" 
+                size="sm"
+                className="h-7 w-7 p-0"
+                onClick={() => setShowChat(!showChat)}
+              >
+                {showChat ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRightOpen className="w-3.5 h-3.5" />}
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        {/* Import Error */}
+        {importError && (
+          <div className="bg-red-50 border-b border-red-200 px-3 py-1 text-xs text-red-800">
+            {importError}
+          </div>
+        )}
+
+        {/* Stats Bar */}
+        <div className="border-b border-border/50 bg-muted/30 px-3 py-1.5">
+          <div className="flex items-center gap-3 text-xs">
+            <div>
+              <span className="text-muted-foreground">Total </span>
+              <span className="font-bold">{leads.length}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Novos </span>
+              <span className="font-bold text-blue-600">{getLeadsByStatus('novo').length}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Negociando </span>
+              <span className="font-bold text-purple-600">{getLeadsByStatus('negociando').length}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Fechados </span>
+              <span className="font-bold text-green-600">{getLeadsByStatus('fechado').length}</span>
+            </div>
           </div>
         </div>
-      )}
 
-      {/* Kanban Board */}
-      {leads.length > 0 && (
-        <div className="flex-1 overflow-x-auto p-2 pb-4">
-          <div className="flex gap-2 h-full" style={{ minWidth: 'max-content', paddingRight: '8px' }}>
-            {statusOrder.map((status) => {
-              const config = statusConfig[status]
-              const statusLeads = getLeadsByStatus(status)
-              
-              return (
-                <div 
-                  key={status}
-                  className="flex-shrink-0 w-44 flex flex-col"
-                  onDragOver={handleDragOver}
-                  onDrop={(e) => handleDrop(e, status)}
+        {/* Empty State */}
+        {leads.length === 0 && (
+          <div className="flex-1 flex items-center justify-center p-4">
+            <div className="text-center max-w-xs">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-2">
+                <MessageCircle className="w-5 h-5 text-muted-foreground" />
+              </div>
+              <h2 className="text-sm font-semibold mb-1">Nenhum lead</h2>
+              <p className="text-muted-foreground text-xs mb-3">
+                {isConnected ? 'Importe seus contatos.' : 'Conecte o WhatsApp.'}
+              </p>
+              {isConnected ? (
+                <Button 
+                  onClick={importFromWhatsApp}
+                  disabled={isImporting}
+                  size="sm"
+                  className="h-7 text-xs bg-green-500 hover:bg-green-600 text-white"
                 >
-                  <div className={`rounded-md border ${config.bgColor} p-1.5 mb-1.5`}>
-                    <div className="flex items-center justify-between">
+                  {isImporting ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Download className="w-3 h-3 mr-1" />}
+                  Importar
+                </Button>
+              ) : (
+                <Link href="/connect">
+                  <Button size="sm" className="h-7 text-xs bg-green-500 hover:bg-green-600 text-white">
+                    <Wifi className="w-3 h-3 mr-1" />
+                    Conectar
+                  </Button>
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Kanban Board */}
+        {leads.length > 0 && (
+          <div className="flex-1 overflow-x-auto p-2 pb-4">
+            <div className="flex gap-2 h-full" style={{ minWidth: 'max-content', paddingRight: '8px' }}>
+              {statusOrder.map((status) => {
+                const config = statusConfig[status]
+                const statusLeads = getLeadsByStatus(status)
+                
+                return (
+                  <div 
+                    key={status}
+                    className="flex-shrink-0 w-40 flex flex-col"
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, status)}
+                  >
+                    <div className={`rounded-md border ${config.bgColor} p-1.5 mb-1`}>
                       <div className="flex items-center gap-1">
                         <span className={`font-semibold text-xs ${config.color}`}>{config.label}</span>
                         <Badge variant="secondary" className="text-[10px] h-4 px-1">
@@ -358,55 +350,62 @@ export default function Dashboard() {
                         </Badge>
                       </div>
                     </div>
-                  </div>
-                  
-                  <ScrollArea className="flex-1 max-h-[75vh]">
-                    <div className="space-y-1.5 pr-1">
-                      {statusLeads.map((lead) => (
-                        <Card 
-                          key={lead.id}
-                          className="p-2 cursor-grab hover:shadow-md transition group"
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, lead)}
-                        >
-                          <div className="flex items-center gap-1.5">
-                            <div className="relative shrink-0">
-                              <Avatar className="h-7 w-7">
-                                <AvatarFallback className="bg-gray-100 text-gray-600 font-medium text-[10px]">
-                                  {lead.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5">
-                                <SourceIcon source={lead.source || 'whatsapp'} className="w-3 h-3" />
+                    
+                    <ScrollArea className="flex-1 max-h-[70vh]">
+                      <div className="space-y-1 pr-1">
+                        {statusLeads.map((lead) => (
+                          <Card 
+                            key={lead.id}
+                            className={`p-1.5 cursor-pointer hover:shadow-md transition ${
+                              selectedLead?.id === lead.id ? 'ring-2 ring-green-500' : ''
+                            }`}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, lead)}
+                            onClick={() => handleCardClick(lead)}
+                          >
+                            <div className="flex items-center gap-1.5">
+                              <div className="relative shrink-0">
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="bg-gray-100 text-gray-600 font-medium text-[9px]">
+                                    {lead.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5">
+                                  <SourceIcon source={lead.source || 'whatsapp'} className="w-2.5 h-2.5" />
+                                </div>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <h3 className="font-medium text-[11px] truncate leading-tight">{lead.name}</h3>
+                                <p className="text-[9px] text-muted-foreground truncate">{lead.phone}</p>
                               </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-medium text-xs truncate leading-tight">{lead.name}</h3>
-                              <p className="text-[10px] text-muted-foreground truncate">{lead.phone}</p>
-                            </div>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-5 w-5 opacity-0 group-hover:opacity-100 transition shrink-0"
-                              onClick={() => openWhatsApp(lead.phone)}
-                            >
-                              <ExternalLink className="w-2.5 h-2.5" />
-                            </Button>
+                          </Card>
+                        ))}
+                        
+                        {statusLeads.length === 0 && (
+                          <div className="text-center py-4 text-muted-foreground text-[9px] border border-dashed rounded-md">
+                            Arraste aqui
                           </div>
-                        </Card>
-                      ))}
-                      
-                      {statusLeads.length === 0 && (
-                        <div className="text-center py-6 text-muted-foreground text-[10px] border border-dashed rounded-md">
-                          Arraste leads aqui
-                        </div>
-                      )}
-                    </div>
-                  </ScrollArea>
-                </div>
-              )
-            })}
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                )
+              })}
+            </div>
           </div>
+        )}
+      </div>
+
+      {/* Chat Panel */}
+      {showChat && (
+        <div className="w-72 border-l bg-background flex-shrink-0 hidden md:block">
+          <ChatPanel 
+            lead={selectedLead} 
+            onClose={() => {
+              setSelectedLead(null)
+            }} 
+          />
         </div>
       )}
     </div>

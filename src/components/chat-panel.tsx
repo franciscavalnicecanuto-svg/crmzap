@@ -1,219 +1,205 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { useLeadsStore } from '@/lib/store'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Badge } from '@/components/ui/badge'
-import { 
-  Send, 
-  Phone, 
-  MoreVertical, 
-  X,
-  Image as ImageIcon,
-  Paperclip,
-  Smile,
-  Check,
-  CheckCheck,
-  Clock
-} from 'lucide-react'
-import { format } from 'date-fns'
-import { ptBR } from 'date-fns/locale'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { X, Send, Loader2 } from 'lucide-react'
 
-interface ChatPanelProps {
-  onClose?: () => void
+interface Message {
+  id: string
+  text: string
+  fromMe: boolean
+  timestamp: string | null
 }
 
-export function ChatPanel({ onClose }: ChatPanelProps) {
-  const { getSelectedLead, selectedLeadId, addMessage, connectionState } = useLeadsStore()
-  const lead = getSelectedLead()
-  const [message, setMessage] = useState('')
-  const [sending, setSending] = useState(false)
+interface ChatPanelProps {
+  lead: {
+    id: string
+    name: string
+    phone: string
+  } | null
+  onClose: () => void
+}
+
+export function ChatPanel({ lead, onClose }: ChatPanelProps) {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [newMessage, setNewMessage] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [isSending, setIsSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
-  
+
+  // Fetch messages when lead changes
   useEffect(() => {
-    // Scroll to bottom when messages change
+    if (lead) {
+      fetchMessages()
+    } else {
+      setMessages([])
+    }
+  }, [lead?.phone])
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [lead?.messages])
-  
-  if (!lead) {
-    return (
-      <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-8">
-        <div className="w-24 h-24 rounded-full bg-muted/50 flex items-center justify-center mb-4">
-          <Send className="w-10 h-10" />
-        </div>
-        <h3 className="text-lg font-medium mb-2">Selecione uma conversa</h3>
-        <p className="text-sm text-center">
-          Clique em um lead no Kanban para ver e enviar mensagens
-        </p>
-      </div>
-    )
+  }, [messages])
+
+  const fetchMessages = async () => {
+    if (!lead) return
+    
+    setIsLoading(true)
+    try {
+      const res = await fetch('/api/whatsapp/history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: lead.phone }),
+      })
+      const data = await res.json()
+      
+      if (data.success) {
+        setMessages(data.messages || [])
+      }
+    } catch (err) {
+      console.error('Failed to fetch messages:', err)
+    } finally {
+      setIsLoading(false)
+    }
   }
-  
-  const handleSend = async () => {
-    if (!message.trim() || sending) return
-    
-    setSending(true)
-    
-    // Add message locally
-    addMessage(lead.id, {
-      text: message,
-      timestamp: new Date(),
-      fromMe: true,
-    })
-    
-    // TODO: Send via Evolution API
-    // await evolutionApi.sendText(lead.phone, message)
-    
-    setMessage('')
-    setSending(false)
+
+  const sendMessage = async () => {
+    if (!lead || !newMessage.trim()) return
+
+    setIsSending(true)
+    try {
+      const res = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          phone: lead.phone, 
+          message: newMessage.trim() 
+        }),
+      })
+      const data = await res.json()
+      
+      if (data.success) {
+        // Add message to local state
+        setMessages(prev => [...prev, {
+          id: data.messageId || Date.now().toString(),
+          text: newMessage.trim(),
+          fromMe: true,
+          timestamp: new Date().toISOString(),
+        }])
+        setNewMessage('')
+      }
+    } catch (err) {
+      console.error('Failed to send message:', err)
+    } finally {
+      setIsSending(false)
+    }
   }
-  
+
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSend()
+      sendMessage()
     }
   }
-  
-  const openWhatsApp = () => {
-    const cleanPhone = lead.phone.replace(/\D/g, '')
-    window.open(`https://wa.me/${cleanPhone}`, '_blank')
+
+  const formatTime = (timestamp: string | null) => {
+    if (!timestamp) return ''
+    const date = new Date(timestamp)
+    return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  if (!lead) {
+    return (
+      <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+        Selecione um lead para ver a conversa
+      </div>
+    )
   }
 
   return (
-    <div className="h-full flex flex-col bg-background border-l">
+    <div className="h-full flex flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b bg-card">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10">
-            <AvatarFallback className="bg-primary/10 text-primary font-medium">
+      <div className="flex items-center justify-between p-3 border-b">
+        <div className="flex items-center gap-2">
+          <Avatar className="h-8 w-8">
+            <AvatarFallback className="bg-green-100 text-green-700 text-xs">
               {lead.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
           <div>
-            <h3 className="font-medium">{lead.name}</h3>
-            <p className="text-xs text-muted-foreground">
-              {connectionState === 'connected' ? (
-                <span className="flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-green-500" />
-                  Online
-                </span>
-              ) : (
-                lead.phone
-              )}
-            </p>
+            <h3 className="font-medium text-sm">{lead.name}</h3>
+            <p className="text-xs text-muted-foreground">{lead.phone}</p>
           </div>
         </div>
-        
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={openWhatsApp} title="Abrir no WhatsApp">
-            <Phone className="w-4 h-4" />
-          </Button>
-          <Button variant="ghost" size="icon">
-            <MoreVertical className="w-4 h-4" />
-          </Button>
-          {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
+        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onClose}>
+          <X className="h-4 w-4" />
+        </Button>
       </div>
-      
+
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="space-y-4">
-          {/* Connection notice */}
-          {connectionState !== 'connected' && (
-            <div className="flex justify-center">
-              <Badge variant="secondary" className="text-xs">
-                Conecte seu WhatsApp para enviar mensagens
-              </Badge>
-            </div>
-          )}
-          
-          {/* Messages */}
-          {lead.messages.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground text-sm">
-              <p>Nenhuma mensagem ainda</p>
-              {lead.lastMessage && (
-                <div className="mt-4 p-3 rounded-lg bg-muted/50 max-w-[80%] mx-auto">
-                  <p className="text-xs text-muted-foreground mb-1">Última mensagem registrada:</p>
-                  <p className="text-sm">{lead.lastMessage}</p>
-                </div>
-              )}
-            </div>
-          ) : (
-            lead.messages.map((msg, index) => (
+      <ScrollArea className="flex-1 p-3" ref={scrollRef}>
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
+            Nenhuma mensagem ainda. Envie a primeira!
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {messages.map((msg) => (
               <div
-                key={msg.id || index}
+                key={msg.id}
                 className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-2 ${
+                  className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
                     msg.fromMe
-                      ? 'bg-primary text-primary-foreground rounded-br-md'
-                      : 'bg-muted rounded-bl-md'
+                      ? 'bg-green-500 text-white'
+                      : 'bg-muted'
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{msg.text}</p>
-                  <div className={`flex items-center justify-end gap-1 mt-1 ${
-                    msg.fromMe ? 'text-primary-foreground/70' : 'text-muted-foreground'
-                  }`}>
-                    <span className="text-[10px]">
-                      {format(new Date(msg.timestamp), 'HH:mm', { locale: ptBR })}
-                    </span>
-                    {msg.fromMe && (
-                      <CheckCheck className="w-3 h-3" />
-                    )}
-                  </div>
+                  <p>{msg.text}</p>
+                  <p className={`text-[10px] mt-1 ${msg.fromMe ? 'text-green-100' : 'text-muted-foreground'}`}>
+                    {formatTime(msg.timestamp)}
+                  </p>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ))}
+          </div>
+        )}
       </ScrollArea>
-      
+
       {/* Input */}
-      <div className="p-4 border-t bg-card">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" className="shrink-0">
-            <Smile className="w-5 h-5 text-muted-foreground" />
-          </Button>
-          <Button variant="ghost" size="icon" className="shrink-0">
-            <Paperclip className="w-5 h-5 text-muted-foreground" />
-          </Button>
+      <div className="p-3 border-t">
+        <div className="flex gap-2">
           <Input
             placeholder="Digite uma mensagem..."
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
+            value={newMessage}
+            onChange={(e) => setNewMessage(e.target.value)}
             onKeyPress={handleKeyPress}
-            className="flex-1"
-            disabled={connectionState !== 'connected'}
+            className="flex-1 h-9 text-sm"
+            disabled={isSending}
           />
           <Button 
-            size="icon" 
-            className="shrink-0 whatsapp-gradient text-white"
-            onClick={handleSend}
-            disabled={!message.trim() || sending || connectionState !== 'connected'}
+            size="sm" 
+            className="h-9 bg-green-500 hover:bg-green-600"
+            onClick={sendMessage}
+            disabled={isSending || !newMessage.trim()}
           >
-            <Send className="w-4 h-4" />
+            {isSending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
           </Button>
         </div>
-        
-        {connectionState !== 'connected' && (
-          <p className="text-xs text-muted-foreground text-center mt-2">
-            <a href="/connect" className="text-primary hover:underline">
-              Conecte seu WhatsApp
-            </a>
-            {' '}para enviar mensagens
-          </p>
-        )}
       </div>
     </div>
   )
