@@ -37,8 +37,11 @@ export async function GET(request: NextRequest) {
       if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') continue // Ignorar grupos e status
       // Ignorar IDs @lid (são IDs internos do WhatsApp, não contatos reais)
       if (jid.endsWith('@lid')) continue
-      // Ignorar contatos de teste
-      if (jid.includes('test@') || jid === '0') continue
+      // Ignorar contatos de teste e inválidos
+      if (jid.includes('test@') || jid === '0' || jid.startsWith('0@') || !jid.includes('@')) continue
+      // Ignorar números muito curtos (inválidos)
+      const phoneNum = jid.replace('@s.whatsapp.net', '')
+      if (phoneNum.length < 8) continue
       
       const phone = jid.replace('@s.whatsapp.net', '').replace('@lid', '')
       
