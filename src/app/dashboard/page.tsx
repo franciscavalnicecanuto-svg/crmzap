@@ -17,7 +17,8 @@ import {
   Loader2,
   ExternalLink,
   PanelRightClose,
-  PanelRightOpen
+  PanelRightOpen,
+  RefreshCw
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -80,6 +81,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState('')
   const [isConnected, setIsConnected] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
   const [importError, setImportError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -179,6 +181,28 @@ export default function Dashboard() {
     }
   }
 
+  // Sync messages from Evolution API to database
+  const syncMessages = async () => {
+    setIsSyncing(true)
+    setImportError(null)
+    try {
+      const res = await fetch('/api/sync', { method: 'POST' })
+      const data = await res.json()
+      
+      if (data.success) {
+        console.log(`Synced ${data.saved}/${data.total} messages`)
+        // After sync, reload leads
+        await importFromWhatsApp()
+      } else {
+        setImportError(data.error || 'Falha ao sincronizar')
+      }
+    } catch (err: any) {
+      setImportError(err.message || 'Erro ao sincronizar')
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
   const moveLead = (id: string, newStatus: LeadStatus) => {
     setLeads(prev => prev.map(lead => 
       lead.id === id ? { ...lead, status: newStatus } : lead
@@ -260,19 +284,36 @@ export default function Dashboard() {
               </Link>
               
               {isConnected && (
-                <Button 
-                  size="sm" 
-                  variant="outline"
-                  className="h-7 text-xs px-2"
-                  onClick={importFromWhatsApp}
-                  disabled={isImporting}
-                >
-                  {isImporting ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <Download className="w-3 h-3" />
-                  )}
-                </Button>
+                <>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="h-7 text-xs px-2"
+                    onClick={syncMessages}
+                    disabled={isSyncing}
+                    title="Sincronizar mensagens"
+                  >
+                    {isSyncing ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="w-3 h-3" />
+                    )}
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="h-7 text-xs px-2"
+                    onClick={importFromWhatsApp}
+                    disabled={isImporting}
+                    title="Importar contatos"
+                  >
+                    {isImporting ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Download className="w-3 h-3" />
+                    )}
+                  </Button>
+                </>
               )}
 
               <Button 
