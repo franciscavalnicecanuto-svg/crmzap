@@ -17,6 +17,51 @@ interface EvolutionWebhookPayload {
 // In-memory fallback se não tiver Supabase
 const inMemoryMessages: Map<string, any[]> = new Map()
 
+// Helper para parsear timestamp
+function parseTimestamp(ts: any): string {
+  if (!ts) return new Date().toISOString()
+  
+  // Se for número (unix timestamp em segundos)
+  if (typeof ts === 'number') {
+    // Se for muito grande, provavelmente está em milissegundos
+    if (ts > 9999999999) {
+      return new Date(ts).toISOString()
+    }
+    return new Date(ts * 1000).toISOString()
+  }
+  
+  // Se for string numérica
+  if (typeof ts === 'string' && /^\d+$/.test(ts)) {
+    const num = parseInt(ts, 10)
+    if (num > 9999999999) {
+      return new Date(num).toISOString()
+    }
+    return new Date(num * 1000).toISOString()
+  }
+  
+  // Se for objeto com low/high (protobuf Long)
+  if (typeof ts === 'object' && ts !== null) {
+    if ('low' in ts) {
+      // Converter Long para número
+      const low = ts.low >>> 0
+      const high = ts.high >>> 0
+      const num = high * 4294967296 + low
+      return new Date(num * 1000).toISOString()
+    }
+  }
+  
+  // Tentar parsear como string ISO
+  try {
+    const date = new Date(ts)
+    if (!isNaN(date.getTime())) {
+      return date.toISOString()
+    }
+  } catch (e) {}
+  
+  // Fallback
+  return new Date().toISOString()
+}
+
 async function saveMessage(message: any) {
   const chatId = message.key?.remoteJid || 'unknown'
   const msgId = message.key?.id || `gen_${Date.now()}_${Math.random().toString(36).slice(2)}`
@@ -32,6 +77,9 @@ async function saveMessage(message: any) {
               '[mídia]'
   }
   
+  // Parsear timestamp com função robusta
+  const timestamp = parseTimestamp(message.messageTimestamp)
+  
   // Tentar salvar no Supabase
   if (supabase) {
     try {
@@ -43,9 +91,7 @@ async function saveMessage(message: any) {
         message_type: message.messageType || 'text',
         content: content,
         push_name: message.pushName || null,
-        timestamp: message.messageTimestamp 
-          ? new Date(Number(message.messageTimestamp) * 1000).toISOString()
-          : new Date().toISOString(),
+        timestamp: timestamp,
         raw_data: message,
       }
       
@@ -199,9 +245,7 @@ export async function GET(request: NextRequest) {
       message_type: 'text',
       content: content.slice(0, 10000), // Limitar tamanho
       push_name: msg.pushName || null,
-      timestamp: msg.messageTimestamp 
-        ? new Date(Number(msg.messageTimestamp) * 1000).toISOString()
-        : new Date().toISOString(),
+      timestamp: parseTimestamp(msg.messageTimestamp),
     }
     
     // Remover raw_data para debug (pode ser muito grande)
@@ -241,9 +285,7 @@ export async function GET(request: NextRequest) {
             message_type: 'text',
             content: content.slice(0, 10000),
             push_name: msg.pushName || null,
-            timestamp: msg.messageTimestamp 
-              ? new Date(Number(msg.messageTimestamp) * 1000).toISOString()
-              : new Date().toISOString(),
+            timestamp: parseTimestamp(msg.messageTimestamp),
           }
           
           const { error } = await supabase.from('messages').upsert(record, { onConflict: 'id' })
