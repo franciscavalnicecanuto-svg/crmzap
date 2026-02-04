@@ -14,15 +14,36 @@ import {
   Wifi,
   ArrowRight,
   Sparkles,
+  LogOut,
 } from 'lucide-react'
 
-type ConnectionState = 'idle' | 'loading' | 'waiting_scan' | 'connecting' | 'connected' | 'error'
+type ConnectionState = 'idle' | 'loading' | 'waiting_scan' | 'connecting' | 'connected' | 'disconnecting' | 'error'
 
 export default function ConnectPage() {
   const [state, setState] = useState<ConnectionState>('idle')
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [countdown, setCountdown] = useState(60)
+
+  // Disconnect WhatsApp
+  const disconnect = async () => {
+    setState('disconnecting')
+    try {
+      const res = await fetch('/api/whatsapp/logout', { method: 'POST' })
+      const data = await res.json()
+      
+      if (data.success) {
+        setState('idle')
+        setQrCode(null)
+      } else {
+        setError(data.error || 'Erro ao desconectar')
+        setState('error')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Erro ao desconectar')
+      setState('error')
+    }
+  }
 
   // Check connection status
   const checkStatus = useCallback(async () => {
@@ -146,12 +167,35 @@ export default function ConnectPage() {
                 <p className="text-muted-foreground mb-6">
                   Seu WhatsApp está pronto para receber e enviar mensagens.
                 </p>
-                <Link href="/dashboard">
-                  <Button className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-500/25">
-                    Ir para o Dashboard
-                    <ArrowRight className="w-4 h-4 ml-2" />
+                <div className="space-y-3">
+                  <Link href="/dashboard">
+                    <Button className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-500/25">
+                      Ir para o Dashboard
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  </Link>
+                  <Button 
+                    variant="outline" 
+                    className="w-full border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                    onClick={disconnect}
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Desconectar WhatsApp
                   </Button>
-                </Link>
+                </div>
+              </Card>
+            )}
+
+            {/* Disconnecting State */}
+            {state === 'disconnecting' && (
+              <Card className="p-8 text-center bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-xl">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-orange-400/50 to-red-500/50 flex items-center justify-center mx-auto mb-6">
+                  <Loader2 className="w-10 h-10 text-orange-600 animate-spin" />
+                </div>
+                <h1 className="text-2xl font-bold mb-2">Desconectando...</h1>
+                <p className="text-muted-foreground">
+                  Aguarde enquanto desconectamos seu WhatsApp.
+                </p>
               </Card>
             )}
 
