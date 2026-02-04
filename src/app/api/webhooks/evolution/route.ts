@@ -173,43 +173,95 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const action = searchParams.get('action')
   
+  // Debug: ver uma mensagem e tentar salvar com detalhes do erro
+  if (action === 'debug' && supabase) {
+    const firstChat = Array.from(inMemoryMessages.entries())[0]
+    if (!firstChat) {
+      return NextResponse.json({ error: 'No messages in memory' })
+    }
+    
+    const [chatId, messages] = firstChat
+    const msg = messages[0]
+    
+    // Extrair conteúdo
+    let content = '[mídia]'
+    if (msg.message) {
+      content = msg.message.conversation ||
+                msg.message.extendedTextMessage?.text ||
+                '[mídia]'
+    }
+    
+    const record = {
+      id: msg.key?.id || `debug_${Date.now()}`,
+      instance_id: 'crmzap',
+      remote_jid: msg.key?.remoteJid || chatId,
+      from_me: msg.key?.fromMe || false,
+      message_type: 'text',
+      content: content.slice(0, 10000), // Limitar tamanho
+      push_name: msg.pushName || null,
+      timestamp: msg.messageTimestamp 
+        ? new Date(Number(msg.messageTimestamp) * 1000).toISOString()
+        : new Date().toISOString(),
+    }
+    
+    // Remover raw_data para debug (pode ser muito grande)
+    const { data, error } = await supabase.from('messages').upsert(record, { onConflict: 'id' }).select()
+    
+    return NextResponse.json({
+      record,
+      supabaseError: error,
+      supabaseData: data,
+      originalMsgKeys: Object.keys(msg),
+      originalMsgSample: JSON.stringify(msg).slice(0, 2000)
+    })
+  }
+  
   // Forçar dump da memória pro banco
   if (action === 'dump' && supabase) {
     let saved = 0
     let errors = 0
+    let lastError: any = null
     
     for (const [chatId, messages] of inMemoryMessages.entries()) {
       for (const msg of messages) {
         try {
-          const { error } = await supabase.from('messages').upsert({
+          // Extrair conteúdo
+          let content = '[mídia]'
+          if (msg.message) {
+            content = msg.message.conversation ||
+                      msg.message.extendedTextMessage?.text ||
+                      '[mídia]'
+          }
+          
+          const record = {
             id: msg.key?.id || `mem_${Date.now()}_${Math.random()}`,
-            instance_id: msg.instanceId || 'crmzap',
+            instance_id: 'crmzap',
             remote_jid: msg.key?.remoteJid || chatId,
             from_me: msg.key?.fromMe || false,
-            message_type: msg.messageType || 'text',
-            content: msg.message?.conversation || 
-                     msg.message?.extendedTextMessage?.text ||
-                     JSON.stringify(msg.message || {}),
+            message_type: 'text',
+            content: content.slice(0, 10000),
             push_name: msg.pushName || null,
             timestamp: msg.messageTimestamp 
               ? new Date(Number(msg.messageTimestamp) * 1000).toISOString()
               : new Date().toISOString(),
-            raw_data: msg,
-          }, { onConflict: 'id' })
+          }
+          
+          const { error } = await supabase.from('messages').upsert(record, { onConflict: 'id' })
           
           if (error) {
-            console.error('[Dump] Error:', error)
+            lastError = error
             errors++
           } else {
             saved++
           }
-        } catch (e) {
+        } catch (e: any) {
+          lastError = e?.message || e
           errors++
         }
       }
     }
     
-    // Limpar memória após dump
+    // Limpar memória após dump se salvou algo
     if (saved > 0) {
       inMemoryMessages.clear()
     }
@@ -218,6 +270,7 @@ export async function GET(request: NextRequest) {
       action: 'dump',
       saved, 
       errors,
+      lastError,
       message: `Dumped ${saved} messages to Supabase`
     })
   }
