@@ -19,35 +19,50 @@ const inMemoryMessages: Map<string, any[]> = new Map()
 
 async function saveMessage(message: any) {
   const chatId = message.key?.remoteJid || 'unknown'
+  const msgId = message.key?.id || `gen_${Date.now()}_${Math.random().toString(36).slice(2)}`
+  
+  // Extrair conteúdo da mensagem
+  let content = '[mídia]'
+  if (message.message) {
+    content = message.message.conversation ||
+              message.message.extendedTextMessage?.text ||
+              message.message.imageMessage?.caption ||
+              message.message.videoMessage?.caption ||
+              message.message.documentMessage?.caption ||
+              '[mídia]'
+  }
   
   // Tentar salvar no Supabase
   if (supabase) {
     try {
-      const { error } = await supabase.from('messages').upsert({
-        id: message.key?.id,
-        instance_id: message.instanceId,
+      const record = {
+        id: msgId,
+        instance_id: message.instanceId || 'crmzap',
         remote_jid: chatId,
         from_me: message.key?.fromMe || false,
-        message_type: message.messageType || 'unknown',
-        content: message.message?.conversation || 
-                 message.message?.extendedTextMessage?.text ||
-                 JSON.stringify(message.message),
-        push_name: message.pushName,
+        message_type: message.messageType || 'text',
+        content: content,
+        push_name: message.pushName || null,
         timestamp: message.messageTimestamp 
           ? new Date(Number(message.messageTimestamp) * 1000).toISOString()
           : new Date().toISOString(),
         raw_data: message,
-      }, { onConflict: 'id' })
+      }
+      
+      const { error } = await supabase.from('messages').upsert(record, { onConflict: 'id' })
       
       if (error) {
-        console.error('[Webhook] Supabase error:', error)
+        console.error('[Webhook] Supabase error:', JSON.stringify(error))
+        console.error('[Webhook] Record was:', JSON.stringify(record).slice(0, 500))
       } else {
-        console.log(`[Webhook] Saved message ${message.key?.id} to Supabase`)
+        console.log(`[Webhook] Saved message ${msgId} to Supabase`)
         return true
       }
-    } catch (err) {
-      console.error('[Webhook] Supabase exception:', err)
+    } catch (err: any) {
+      console.error('[Webhook] Supabase exception:', err?.message || err)
     }
+  } else {
+    console.log('[Webhook] Supabase not configured, using memory')
   }
   
   // Fallback: in-memory
@@ -55,7 +70,7 @@ async function saveMessage(message: any) {
     inMemoryMessages.set(chatId, [])
   }
   inMemoryMessages.get(chatId)!.push(message)
-  console.log(`[Webhook] Saved message ${message.key?.id} to memory (chat: ${chatId})`)
+  console.log(`[Webhook] Saved message ${msgId} to memory (chat: ${chatId})`)
   return true
 }
 
