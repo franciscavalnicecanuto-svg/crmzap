@@ -122,22 +122,23 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [])
 
-  // Import contacts from WhatsApp
+  // Import contacts with conversations from database
   const importFromWhatsApp = async () => {
     setIsImporting(true)
     setImportError(null)
     try {
-      const res = await fetch('/api/whatsapp/import-chats', { method: 'POST' })
+      // Primeiro tenta buscar do banco (só contatos com mensagens)
+      const res = await fetch('/api/leads')
       const data = await res.json()
       
-      if (data.success && data.leads) {
-        const newLeads: Lead[] = data.leads.slice(0, 200).map((lead: any) => ({
-          id: `wa_${lead.phone}`,
-          name: lead.name || lead.phone,
-          phone: lead.phone,
+      if (data.success && data.contacts) {
+        const newLeads: Lead[] = data.contacts.map((contact: any) => ({
+          id: `wa_${contact.phone}`,
+          name: contact.name || contact.phone,
+          phone: contact.phone,
           status: 'novo' as LeadStatus,
           source: 'whatsapp' as LeadSource,
-          whatsappId: lead.whatsappId,
+          whatsappId: contact.id,
         }))
         
         setLeads(prev => {
@@ -146,9 +147,30 @@ export default function Dashboard() {
           return [...prev, ...uniqueNew]
         })
         
-        console.log(`Imported ${newLeads.length} contacts`)
+        console.log(`Imported ${newLeads.length} contacts with conversations`)
       } else {
-        setImportError(data.error || 'Falha ao importar contatos')
+        // Fallback: buscar da Evolution API
+        const res2 = await fetch('/api/whatsapp/import-chats', { method: 'POST' })
+        const data2 = await res2.json()
+        
+        if (data2.success && data2.leads) {
+          const newLeads: Lead[] = data2.leads.slice(0, 200).map((lead: any) => ({
+            id: `wa_${lead.phone}`,
+            name: lead.name || lead.phone,
+            phone: lead.phone,
+            status: 'novo' as LeadStatus,
+            source: 'whatsapp' as LeadSource,
+            whatsappId: lead.whatsappId,
+          }))
+          
+          setLeads(prev => {
+            const existingIds = new Set(prev.map(l => l.id))
+            const uniqueNew = newLeads.filter(l => !existingIds.has(l.id))
+            return [...prev, ...uniqueNew]
+          })
+        } else {
+          setImportError(data2.error || 'Falha ao importar contatos')
+        }
       }
     } catch (err: any) {
       setImportError(err.message || 'Erro ao importar')
