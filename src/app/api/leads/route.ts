@@ -35,22 +35,39 @@ export async function GET(request: NextRequest) {
     for (const msg of messages || []) {
       const jid = msg.remote_jid
       if (!jid || jid.endsWith('@g.us') || jid === 'status@broadcast') continue // Ignorar grupos e status
+      // Ignorar IDs @lid (são IDs internos do WhatsApp, não contatos reais)
+      if (jid.endsWith('@lid')) continue
+      // Ignorar contatos de teste
+      if (jid.includes('test@') || jid === '0') continue
       
-      const phone = jid.replace('@s.whatsapp.net', '')
+      const phone = jid.replace('@s.whatsapp.net', '').replace('@lid', '')
       
       if (!contactsMap.has(jid)) {
+        // Pegar nome: preferir push_name de mensagens RECEBIDAS (não "Você")
+        const contactName = (!msg.from_me && msg.push_name && msg.push_name !== 'Você') 
+          ? msg.push_name 
+          : phone
+        
         contactsMap.set(jid, {
           id: jid,
           phone: phone,
-          name: msg.push_name || phone,
+          name: contactName,
           lastMessage: msg.content || '',
           lastMessageAt: msg.timestamp,
           unreadCount: msg.from_me ? 0 : 1
         })
-      } else if (!msg.from_me) {
-        // Incrementar unread se não for mensagem enviada
+      } else {
         const contact = contactsMap.get(jid)!
-        contact.unreadCount++
+        
+        // Atualizar nome se encontrar um nome real (não "Você" e não número)
+        if (!msg.from_me && msg.push_name && msg.push_name !== 'Você' && contact.name === contact.phone) {
+          contact.name = msg.push_name
+        }
+        
+        // Incrementar unread se não for mensagem enviada
+        if (!msg.from_me) {
+          contact.unreadCount++
+        }
       }
     }
 
