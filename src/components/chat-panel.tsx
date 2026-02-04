@@ -30,10 +30,17 @@ export function ChatPanel({ lead, onClose }: ChatPanelProps) {
   const [isSending, setIsSending] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Fetch messages when lead changes
+  // Fetch messages when lead changes + polling every 5s
   useEffect(() => {
     if (lead) {
       fetchMessages()
+      
+      // Polling for real-time updates
+      const interval = setInterval(() => {
+        fetchMessages()
+      }, 5000)
+      
+      return () => clearInterval(interval)
     } else {
       setMessages([])
     }
