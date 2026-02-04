@@ -153,10 +153,64 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Endpoint para verificar status
-export async function GET() {
+// Endpoint para verificar status e forçar dump
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const action = searchParams.get('action')
+  
+  // Forçar dump da memória pro banco
+  if (action === 'dump' && supabase) {
+    let saved = 0
+    let errors = 0
+    
+    for (const [chatId, messages] of inMemoryMessages.entries()) {
+      for (const msg of messages) {
+        try {
+          const { error } = await supabase.from('messages').upsert({
+            id: msg.key?.id || `mem_${Date.now()}_${Math.random()}`,
+            instance_id: msg.instanceId || 'crmzap',
+            remote_jid: msg.key?.remoteJid || chatId,
+            from_me: msg.key?.fromMe || false,
+            message_type: msg.messageType || 'text',
+            content: msg.message?.conversation || 
+                     msg.message?.extendedTextMessage?.text ||
+                     JSON.stringify(msg.message || {}),
+            push_name: msg.pushName || null,
+            timestamp: msg.messageTimestamp 
+              ? new Date(Number(msg.messageTimestamp) * 1000).toISOString()
+              : new Date().toISOString(),
+            raw_data: msg,
+          }, { onConflict: 'id' })
+          
+          if (error) {
+            console.error('[Dump] Error:', error)
+            errors++
+          } else {
+            saved++
+          }
+        } catch (e) {
+          errors++
+        }
+      }
+    }
+    
+    // Limpar memória após dump
+    if (saved > 0) {
+      inMemoryMessages.clear()
+    }
+    
+    return NextResponse.json({ 
+      action: 'dump',
+      saved, 
+      errors,
+      message: `Dumped ${saved} messages to Supabase`
+    })
+  }
+  
   const stats = {
     supabaseConnected: !!supabase,
+    supabaseUrl: supabaseUrl ? 'configured' : 'missing',
+    supabaseKey: supabaseKey ? 'configured' : 'missing',
     inMemoryChats: inMemoryMessages.size,
     totalInMemoryMessages: Array.from(inMemoryMessages.values()).reduce((a, b) => a + b.length, 0),
   }
