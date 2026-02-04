@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
-const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL || 'https://evolution-api-production-d9c1.up.railway.app'
-const EVOLUTION_API_KEY = process.env.EVOLUTION_API_KEY || '066CC5A7-FBDD-4BCC-98C4-48567F198CF9'
-const INSTANCE_NAME = process.env.EVOLUTION_INSTANCE_NAME || 'crmzap'
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseKey = process.env.SUPABASE_SERVICE_KEY || ''
+const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,52 +16,45 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (!supabase) {
+      return NextResponse.json(
+        { error: 'Database not configured' },
+        { status: 500 }
+      )
+    }
+
     // Clean phone number and format as WhatsApp JID
     const cleanPhone = phone.replace(/\D/g, '')
     const remoteJid = `${cleanPhone}@s.whatsapp.net`
 
-    const response = await fetch(
-      `${EVOLUTION_API_URL}/chat/findMessages/${INSTANCE_NAME}`,
-      {
-        method: 'POST',
-        headers: {
-          'apikey': EVOLUTION_API_KEY,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          where: {
-            key: {
-              remoteJid: remoteJid,
-            },
-          },
-          page: 1,
-          limit: 50,
-        }),
-      }
-    )
+    // Fetch from Supabase - ordered by timestamp ASC (oldest first, newest at bottom)
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select('id, content, from_me, timestamp, push_name')
+      .eq('remote_jid', remoteJid)
+      .order('timestamp', { ascending: true })
+      .limit(100)
 
-    if (!response.ok) {
-      const error = await response.text()
+    if (error) {
+      console.error('Supabase error:', error)
       return NextResponse.json(
-        { error: 'Failed to fetch messages', details: error },
-        { status: response.status }
+        { error: 'Failed to fetch messages', details: error.message },
+        { status: 500 }
       )
     }
 
-    const data = await response.json()
-    
-    // Transform messages to simpler format
-    const messages = (data.messages?.records || []).map((msg: any) => ({
-      id: msg.key?.id || msg.id,
-      text: msg.message?.conversation || msg.message?.extendedTextMessage?.text || '[mídia]',
-      fromMe: msg.key?.fromMe || false,
-      timestamp: msg.messageTimestamp ? new Date(msg.messageTimestamp * 1000).toISOString() : null,
+    // Transform to expected format
+    const formattedMessages = (messages || []).map((msg: any) => ({
+      id: msg.id,
+      text: msg.content || '[mídia]',
+      fromMe: msg.from_me || false,
+      timestamp: msg.timestamp,
     }))
 
     return NextResponse.json({
       success: true,
-      messages,
-      total: data.messages?.total || 0,
+      messages: formattedMessages,
+      total: formattedMessages.length,
     })
   } catch (error: any) {
     console.error('Fetch history error:', error)
