@@ -1,4 +1,4 @@
-// WhatsZap Messaging API Client
+// CRMzap Messaging API Client
 // Connects to whatszap-messaging service
 
 const API_URL = process.env.NEXT_PUBLIC_MESSAGING_API_URL || 'http://localhost:3001'

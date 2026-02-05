@@ -27,12 +27,12 @@ export async function POST(request: NextRequest) {
     const cleanPhone = phone.replace(/\D/g, '')
     const remoteJid = `${cleanPhone}@s.whatsapp.net`
 
-    // Fetch from Supabase - ordered by timestamp ASC (oldest first, newest at bottom)
+    // Fetch from Supabase - get 100 most recent, then reverse to show oldest first
     const { data: messages, error } = await supabase
       .from('messages')
       .select('id, content, from_me, timestamp, push_name')
       .eq('remote_jid', remoteJid)
-      .order('timestamp', { ascending: true })
+      .order('timestamp', { ascending: false })
       .limit(100)
 
     if (error) {
@@ -43,13 +43,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Transform to expected format
-    const formattedMessages = (messages || []).map((msg: any) => ({
-      id: msg.id,
-      text: msg.content || '[mídia]',
-      fromMe: msg.from_me || false,
-      timestamp: msg.timestamp,
-    }))
+    // Transform to expected format and reverse to show oldest first (for chat display)
+    const formattedMessages = (messages || [])
+      .map((msg: any) => ({
+        id: msg.id,
+        text: msg.content || '[mídia]',
+        fromMe: msg.from_me || false,
+        timestamp: msg.timestamp,
+      }))
+      .reverse()
 
     return NextResponse.json({
       success: true,

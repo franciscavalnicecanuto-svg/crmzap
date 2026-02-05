@@ -23,7 +23,7 @@ function ensureInitialized() {
         enabled: true,
         evolutionApiUrl: process.env.EVOLUTION_API_URL,
         evolutionApiKey: process.env.EVOLUTION_API_KEY!,
-        instanceName: process.env.EVOLUTION_INSTANCE_NAME || 'crmzap',
+        instanceName: process.env.EVOLUTION_INSTANCE || 'crmzap',
       })
     }
     

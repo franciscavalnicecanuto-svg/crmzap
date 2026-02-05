@@ -17,6 +17,38 @@ interface EvolutionWebhookPayload {
 // In-memory fallback se não tiver Supabase
 const inMemoryMessages: Map<string, any[]> = new Map()
 
+// ============ BUG #10 FIX: Retry with exponential backoff ============
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: { maxAttempts?: number; baseDelayMs?: number; maxDelayMs?: number } = {}
+): Promise<T> {
+  const { maxAttempts = 3, baseDelayMs = 100, maxDelayMs = 2000 } = options
+  let lastError: any
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn()
+    } catch (error: any) {
+      lastError = error
+      
+      // Don't retry on client errors (4xx) - only on server/network errors
+      if (error?.status >= 400 && error?.status < 500) {
+        throw error
+      }
+      
+      if (attempt < maxAttempts) {
+        // Exponential backoff with jitter
+        const delay = Math.min(baseDelayMs * Math.pow(2, attempt - 1), maxDelayMs)
+        const jitter = delay * 0.2 * Math.random() // Add 0-20% jitter
+        console.log(`[Webhook] Retry attempt ${attempt}/${maxAttempts} after ${Math.round(delay + jitter)}ms`)
+        await new Promise(resolve => setTimeout(resolve, delay + jitter))
+      }
+    }
+  }
+  
+  throw lastError
+}
+
 // Helper para parsear timestamp
 function parseTimestamp(ts: any): string {
   if (!ts) return new Date().toISOString()
@@ -80,32 +112,41 @@ async function saveMessage(message: any) {
   // Parsear timestamp com função robusta
   const timestamp = parseTimestamp(message.messageTimestamp)
   
-  // Tentar salvar no Supabase
+  // Tentar salvar no Supabase com retry (BUG #10 fix)
   if (supabase) {
+    const record = {
+      id: msgId,
+      instance_id: message.instanceId || 'crmzap',
+      remote_jid: chatId,
+      from_me: message.key?.fromMe || false,
+      message_type: message.messageType || 'text',
+      content: content,
+      push_name: message.pushName || null,
+      timestamp: timestamp,
+      raw_data: message,
+    }
+    
     try {
-      const record = {
-        id: msgId,
-        instance_id: message.instanceId || 'crmzap',
-        remote_jid: chatId,
-        from_me: message.key?.fromMe || false,
-        message_type: message.messageType || 'text',
-        content: content,
-        push_name: message.pushName || null,
-        timestamp: timestamp,
-        raw_data: message,
-      }
-      
-      const { error } = await supabase.from('messages').upsert(record, { onConflict: 'id' })
-      
-      if (error) {
-        console.error('[Webhook] Supabase error:', JSON.stringify(error))
-        console.error('[Webhook] Record was:', JSON.stringify(record).slice(0, 500))
-      } else {
+      await withRetry(async () => {
+        const { error } = await supabase.from('messages').upsert(record, { onConflict: 'id' })
+        
+        if (error) {
+          console.error('[Webhook] Supabase error:', JSON.stringify(error))
+          // Throw to trigger retry on specific error codes
+          if (error.code === 'PGRST503' || error.code === '57P01' || error.message?.includes('connection')) {
+            throw { ...error, status: 503 } // Server error - will retry
+          }
+          // Don't retry on other errors (constraint violations, etc)
+          console.error('[Webhook] Record was:', JSON.stringify(record).slice(0, 500))
+          return // Exit without throwing - won't retry
+        }
+        
         console.log(`[Webhook] Saved message ${msgId} to Supabase`)
-        return true
-      }
+      }, { maxAttempts: 3, baseDelayMs: 100, maxDelayMs: 2000 })
+      
+      return true
     } catch (err: any) {
-      console.error('[Webhook] Supabase exception:', err?.message || err)
+      console.error('[Webhook] Supabase failed after retries:', err?.message || err)
     }
   } else {
     console.log('[Webhook] Supabase not configured, using memory')
@@ -143,6 +184,24 @@ async function saveChat(chat: any) {
 export async function POST(request: NextRequest) {
   try {
     const payload: EvolutionWebhookPayload = await request.json()
+    
+    // Validar payload básico
+    if (!payload || typeof payload !== 'object') {
+      console.warn('[Webhook] Invalid payload: not an object')
+      return NextResponse.json(
+        { success: false, error: 'Invalid payload' },
+        { status: 400 }
+      )
+    }
+    
+    // Validar presença do campo event
+    if (!payload.event || typeof payload.event !== 'string') {
+      console.warn('[Webhook] Missing or invalid event field:', payload)
+      return NextResponse.json(
+        { success: false, error: 'Missing or invalid event field' },
+        { status: 400 }
+      )
+    }
     
     console.log(`[Webhook] Received event: ${payload.event} from instance: ${payload.instance}`)
     

@@ -1,13 +1,27 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ChatPanel } from '@/components/chat-panel'
+import { useToast } from '@/components/ui/toast-notification'
+import { EmptyState } from '@/components/empty-state'
+import { DashboardSkeleton, LeadCardSkeleton } from '@/components/lead-card-skeleton'
+import { ConnectionStatus } from '@/components/connection-status'
+import { ReportsModal } from '@/components/reports-modal'
+import { useSettings } from '@/components/theme-provider'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { 
   MessageCircle, 
   Search,
@@ -18,9 +32,36 @@ import {
   ExternalLink,
   PanelRightClose,
   PanelRightOpen,
-  RefreshCw
+  RefreshCw,
+  Trash2,
+  User,
+  Settings,
+  LogOut,
+  CreditCard,
+  ChevronDown,
+  Bell,
+  Tag,
+  Calendar,
+  BarChart3,
+  X,
+  Plus,
+  Clock,
+  DollarSign,
+  TrendingUp,
+  Filter,
+  AlertCircle,
+  Check,
+  Archive
 } from 'lucide-react'
 import Link from 'next/link'
+import { getUser, getSession, signOut } from '@/lib/supabase-client'
+
+interface UserInfo {
+  id: string
+  email: string
+  name?: string
+  avatarUrl?: string
+}
 
 type LeadStatus = 'novo' | 'em_contato' | 'negociando' | 'fechado' | 'perdido'
 type LeadSource = 'whatsapp' | 'telegram' | 'instagram' | 'facebook' | 'unknown'
@@ -32,6 +73,43 @@ interface Lead {
   status: LeadStatus
   source: LeadSource
   whatsappId?: string
+  unreadCount?: number
+  lastMessage?: string
+  profilePicUrl?: string | null
+  // New fields for features
+  tags?: string[]
+  value?: number
+  reminderDate?: string
+  reminderNote?: string
+  createdAt?: string
+}
+
+// Tag definitions with colors and categories (only 1 per category allowed)
+const TAG_OPTIONS = [
+  { label: 'Interesse: Alto', category: 'interesse', color: 'bg-green-500/20 text-green-400 border-green-500/30' },
+  { label: 'Interesse: Médio', category: 'interesse', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' },
+  { label: 'Interesse: Baixo', category: 'interesse', color: 'bg-gray-500/20 text-gray-400 border-gray-500/30' },
+  { label: 'Objeção: Preço', category: 'objecao', color: 'bg-red-500/20 text-red-400 border-red-500/30' },
+  { label: 'Objeção: Prazo', category: 'objecao', color: 'bg-orange-500/20 text-orange-400 border-orange-500/30' },
+  { label: 'Urgente', category: 'status', color: 'bg-red-600/20 text-red-300 border-red-600/30' },
+  { label: 'VIP', category: 'tipo', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
+]
+
+const getTagColor = (tag: string) => {
+  const found = TAG_OPTIONS.find(t => t.label === tag)
+  return found?.color || 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+}
+
+const getTagCategory = (tag: string) => {
+  const found = TAG_OPTIONS.find(t => t.label === tag)
+  return found?.category || null
+}
+
+interface Reminder {
+  leadId: string
+  leadName: string
+  date: string
+  note?: string
 }
 
 // Ícones das plataformas
@@ -66,7 +144,8 @@ const SourceIcon = ({ source, className = "w-3.5 h-3.5" }: { source: LeadSource;
   }
 }
 
-const statusConfig: Record<LeadStatus, { label: string; color: string; bgColor: string }> = {
+// Default status config (can be overridden by user settings)
+const defaultStatusConfig: Record<LeadStatus, { label: string; color: string; bgColor: string }> = {
   novo: { label: 'Novo', color: 'text-blue-600', bgColor: 'bg-blue-50 border-blue-200' },
   em_contato: { label: 'Em Contato', color: 'text-amber-600', bgColor: 'bg-amber-50 border-amber-200' },
   negociando: { label: 'Negociando', color: 'text-purple-600', bgColor: 'bg-purple-50 border-purple-200' },
@@ -74,9 +153,128 @@ const statusConfig: Record<LeadStatus, { label: string; color: string; bgColor: 
   perdido: { label: 'Perdido', color: 'text-gray-600', bgColor: 'bg-gray-50 border-gray-200' },
 }
 
-const statusOrder: LeadStatus[] = ['novo', 'em_contato', 'negociando', 'fechado', 'perdido']
+interface KanbanColumn {
+  id: string
+  label: string
+  color: string
+  bgColor: string
+  visible: boolean
+}
 
-export default function Dashboard() {
+const defaultKanbanColumns: KanbanColumn[] = [
+  { id: 'novo', label: 'Novo', color: 'text-blue-600', bgColor: 'bg-blue-50 border-blue-200', visible: true },
+  { id: 'em_contato', label: 'Em Contato', color: 'text-amber-600', bgColor: 'bg-amber-50 border-amber-200', visible: true },
+  { id: 'negociando', label: 'Negociando', color: 'text-purple-600', bgColor: 'bg-purple-50 border-purple-200', visible: true },
+  { id: 'fechado', label: 'Fechado', color: 'text-green-600', bgColor: 'bg-green-50 border-green-200', visible: true },
+  { id: 'perdido', label: 'Perdido', color: 'text-gray-600', bgColor: 'bg-gray-50 border-gray-200', visible: true },
+]
+
+// Chat Panel Wrapper with animations and swipe-to-close
+function ChatPanelWrapper({ 
+  isMobile, 
+  showChat, 
+  selectedLead, 
+  isConnected, 
+  onClose,
+  onOpenTags,
+  onOpenReminder,
+  onTagsUpdate
+}: {
+  isMobile: boolean
+  showChat: boolean
+  selectedLead: Lead | null
+  isConnected: boolean
+  onClose: () => void
+  onOpenTags?: () => void
+  onOpenReminder?: () => void
+  onTagsUpdate?: (leadId: string, tags: string[]) => void
+}) {
+  const [swipeX, setSwipeX] = useState(0)
+  const [isSwiping, setIsSwiping] = useState(false)
+  const touchStartX = useRef(0)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  // Handle swipe gestures on mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!isMobile) return
+    touchStartX.current = e.touches[0].clientX
+    setIsSwiping(true)
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isMobile || !isSwiping) return
+    const currentX = e.touches[0].clientX
+    const diff = currentX - touchStartX.current
+    // Only allow swipe to the right (positive diff)
+    if (diff > 0) {
+      setSwipeX(Math.min(diff, 300))
+    }
+  }
+
+  const handleTouchEnd = () => {
+    if (!isMobile) return
+    setIsSwiping(false)
+    // If swiped more than 100px, close the panel
+    if (swipeX > 100) {
+      onClose()
+    }
+    setSwipeX(0)
+  }
+
+  return (
+    <>
+      {/* Mobile overlay backdrop with fade animation */}
+      {isMobile && showChat && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 animate-in fade-in-0 duration-200"
+          onClick={onClose}
+          style={{ opacity: swipeX > 0 ? 1 - (swipeX / 300) : 1 }}
+        />
+      )}
+      {/* Chat panel with slide animation */}
+      <div 
+        ref={panelRef}
+        className={`
+          ${isMobile 
+            ? 'fixed inset-y-0 right-0 z-50 w-full sm:w-96 animate-in slide-in-from-right duration-300' 
+            : 'relative w-96 flex-shrink-0'
+          }
+          border-l bg-background 
+          flex flex-col h-full
+          ${isMobile && !showChat ? 'hidden' : ''}
+        `}
+        style={isMobile && swipeX > 0 ? { 
+          transform: `translateX(${swipeX}px)`,
+          transition: isSwiping ? 'none' : 'transform 0.2s ease-out'
+        } : undefined}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        {/* Swipe indicator */}
+        {isMobile && (
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 w-1 h-16 bg-gray-300 rounded-full opacity-30" />
+        )}
+        <ChatPanel 
+          lead={selectedLead ? { 
+            ...selectedLead, 
+            status: selectedLead.status,
+            profilePicUrl: selectedLead.profilePicUrl,
+            tags: selectedLead.tags,
+            reminderDate: selectedLead.reminderDate
+          } : null} 
+          onClose={onClose}
+          isConnected={isConnected}
+          onTagsUpdate={onTagsUpdate}
+          onOpenTags={onOpenTags}
+          onOpenReminder={onOpenReminder}
+        />
+      </div>
+    </>
+  )
+}
+
+function DashboardContent() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [search, setSearch] = useState('')
   const [isConnected, setIsConnected] = useState(false)
@@ -85,9 +283,129 @@ export default function Dashboard() {
   const [importError, setImportError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
-  const [showChat, setShowChat] = useState(true)
+  const [showChat, setShowChat] = useState(false) // Start with chat hidden on mobile
+  const [isMobile, setIsMobile] = useState(false)
+  const [readLeads, setReadLeads] = useState<Set<string>>(new Set())
+  const [isPulling, setIsPulling] = useState(false)
+  const [pullDistance, setPullDistance] = useState(0)
+  const pullStartY = useRef(0)
+  const [user, setUser] = useState<UserInfo | null>(null)
+  const [isLoadingUser, setIsLoadingUser] = useState(true)
+  const [isLoadingLeads, setIsLoadingLeads] = useState(true)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState<Lead | null>(null) // Bug fix #4: Confirmação de delete
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const { showToast } = useToast()
+  const { settings } = useSettings()
+  
+  // Bug fix #1: Atualizar selectedLead quando leads muda
+  // Bug fix #29: Only update if lead data actually changed (avoid infinite loops)
+  useEffect(() => {
+    if (selectedLead) {
+      const updatedLead = leads.find(l => l.id === selectedLead.id)
+      if (updatedLead) {
+        // Only update if any field actually changed
+        const hasChanges = 
+          updatedLead.tags?.join(',') !== selectedLead.tags?.join(',') ||
+          updatedLead.reminderDate !== selectedLead.reminderDate ||
+          updatedLead.reminderNote !== selectedLead.reminderNote ||
+          updatedLead.status !== selectedLead.status ||
+          updatedLead.value !== selectedLead.value ||
+          updatedLead.unreadCount !== selectedLead.unreadCount ||
+          updatedLead.lastMessage !== selectedLead.lastMessage ||
+          updatedLead.profilePicUrl !== selectedLead.profilePicUrl
+        
+        if (hasChanges) {
+          setSelectedLead(updatedLead)
+        }
+      } else {
+        // Bug fix #8: Lead foi deletado, limpar seleção
+        setSelectedLead(null)
+        setShowChat(false)
+      }
+    }
+  }, [leads])
+  
+  // New states for features
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | '7days' | '30days'>('all')
+  const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const [showReminderModal, setShowReminderModal] = useState(false)
+  const [reminderLead, setReminderLead] = useState<Lead | null>(null)
+  const [reminderDate, setReminderDate] = useState('')
+  const [reminderNote, setReminderNote] = useState('')
+  const [showTagModal, setShowTagModal] = useState(false)
+  const [tagLead, setTagLead] = useState<Lead | null>(null)
+  const [showReportsModal, setShowReportsModal] = useState(false)
+  const [kanbanColumns, setKanbanColumns] = useState<KanbanColumn[]>(defaultKanbanColumns)
 
-  // Load leads from localStorage on mount
+  // Bug fix #3: Fechar modais com ESC
+  useEffect(() => {
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showDeleteConfirm) setShowDeleteConfirm(null)
+        else if (showTagModal) setShowTagModal(false)
+        else if (showReminderModal) setShowReminderModal(false)
+        else if (showReportsModal) setShowReportsModal(false)
+      }
+    }
+    window.addEventListener('keydown', handleEsc)
+    return () => window.removeEventListener('keydown', handleEsc)
+  }, [showTagModal, showReminderModal, showReportsModal, showDeleteConfirm])
+
+  // Fetch user on mount
+  useEffect(() => {
+    async function loadUser() {
+      try {
+        const { user: authUser, error } = await getUser()
+        if (error || !authUser) {
+          // Not logged in, redirect to login
+          router.push('/login')
+          return
+        }
+        setUser({
+          id: authUser.id,
+          email: authUser.email || '',
+          name: authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'Usuário',
+          avatarUrl: authUser.user_metadata?.avatar_url || authUser.user_metadata?.picture
+        })
+      } catch (e) {
+        console.error('Failed to load user:', e)
+        router.push('/login')
+      } finally {
+        setIsLoadingUser(false)
+      }
+    }
+    loadUser()
+  }, [router])
+
+  // Handle logout
+  async function handleLogout() {
+    try {
+      await signOut()
+      router.push('/login')
+    } catch (e) {
+      console.error('Logout error:', e)
+    }
+  }
+
+  // Detect mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      // On mobile, start with list view (chat hidden) unless a lead is selected
+      if (mobile && !selectedLead) {
+        setShowChat(false)
+      } else if (!mobile) {
+        setShowChat(true) // Desktop always shows chat panel
+      }
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [selectedLead])
+
+  // Load leads and read state from localStorage on mount
   useEffect(() => {
     setMounted(true)
     const saved = localStorage.getItem('whatszap-leads-v3')
@@ -98,7 +416,108 @@ export default function Dashboard() {
         console.error('Failed to parse leads:', e)
       }
     }
+    // Load read state
+    const readState = localStorage.getItem('whatszap-read-leads')
+    if (readState) {
+      try {
+        setReadLeads(new Set(JSON.parse(readState)))
+      } catch (e) {
+        console.error('Failed to parse read state:', e)
+      }
+    }
+    // Load custom kanban columns
+    const savedColumns = localStorage.getItem('whatszap-kanban-columns')
+    if (savedColumns) {
+      try {
+        setKanbanColumns(JSON.parse(savedColumns))
+      } catch (e) {
+        console.error('Failed to parse kanban columns:', e)
+      }
+    }
+    
+    // Bug fix #28: Cleanup timeout to prevent memory leak on unmount
+    const loadingTimeout = setTimeout(() => setIsLoadingLeads(false), 300)
+    return () => clearTimeout(loadingTimeout)
   }, [])
+
+  // Bug fix #5: Handle lead query parameter from reminders page
+  useEffect(() => {
+    const leadId = searchParams.get('lead')
+    if (leadId && leads.length > 0) {
+      const lead = leads.find(l => l.id === leadId)
+      if (lead) {
+        setSelectedLead(lead)
+        setShowChat(true)
+        // Clear the query parameter
+        router.replace('/dashboard', { scroll: false })
+      }
+    }
+  }, [searchParams, leads, router])
+
+  // Update document title with unread count
+  useEffect(() => {
+    if (!mounted) return
+    const unreadCount = leads.filter(l => (l.unreadCount || 0) > 0 && !readLeads.has(l.id)).length
+    if (unreadCount > 0) {
+      document.title = `(${unreadCount}) CRMzap`
+    } else {
+      document.title = 'CRMzap'
+    }
+  }, [leads, readLeads, mounted])
+
+  // Bug fix #6: Browser notifications for due reminders
+  useEffect(() => {
+    if (!mounted) return
+    
+    // Request notification permission on mount
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission()
+    }
+    
+    // Check for due reminders every 30 seconds
+    const checkReminders = () => {
+      const now = new Date()
+      const notifiedKey = 'whatszap-notified-reminders'
+      const notified = new Set(JSON.parse(localStorage.getItem(notifiedKey) || '[]'))
+      
+      leads.forEach(lead => {
+        if (!lead.reminderDate) return
+        const reminderTime = new Date(lead.reminderDate)
+        const timeDiff = reminderTime.getTime() - now.getTime()
+        
+        // Notify if reminder is due (within 1 minute) and not already notified
+        if (timeDiff <= 60000 && timeDiff > -300000 && !notified.has(lead.id)) {
+          // Show browser notification
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(`🔔 Lembrete: ${lead.name}`, {
+              body: lead.reminderNote || 'É hora de fazer follow-up!',
+              icon: '/logo.png',
+              tag: `reminder-${lead.id}`,
+              requireInteraction: true
+            })
+          }
+          
+          // Show toast
+          showToast(`🔔 Lembrete: ${lead.name}`, 'info')
+          
+          // Play sound
+          try {
+            const audio = new Audio('/notification.mp3')
+            audio.volume = 0.5
+            audio.play().catch(() => {})
+          } catch {}
+          
+          // Mark as notified
+          notified.add(lead.id)
+          localStorage.setItem(notifiedKey, JSON.stringify([...notified]))
+        }
+      })
+    }
+    
+    checkReminders()
+    const interval = setInterval(checkReminders, 30000)
+    return () => clearInterval(interval)
+  }, [leads, mounted, showToast])
 
   // Save leads to localStorage when they change
   useEffect(() => {
@@ -106,6 +525,43 @@ export default function Dashboard() {
       localStorage.setItem('whatszap-leads-v3', JSON.stringify(leads))
     }
   }, [leads, mounted])
+
+  // BUG #8 FIX: Load lead statuses from Supabase on mount
+  useEffect(() => {
+    if (!mounted) return
+    
+    const loadStatusFromSupabase = async () => {
+      try {
+        const res = await fetch('/api/leads/status')
+        const data = await res.json()
+        
+        if (data.success && data.statuses) {
+          // Atualizar leads com status do Supabase
+          setLeads(prev => prev.map(lead => {
+            const phone = lead.phone.replace(/\D/g, '')
+            const jid = `${phone}@s.whatsapp.net`
+            const savedStatus = data.statuses[jid]
+            if (savedStatus && savedStatus !== lead.status) {
+              return { ...lead, status: savedStatus as LeadStatus }
+            }
+            return lead
+          }))
+        }
+      } catch (err) {
+        console.error('Failed to load status from Supabase:', err)
+      }
+    }
+    
+    // Delay para aguardar localStorage carregar primeiro
+    setTimeout(loadStatusFromSupabase, 500)
+  }, [mounted])
+
+  // Save read state to localStorage when it changes
+  useEffect(() => {
+    if (mounted && readLeads.size > 0) {
+      localStorage.setItem('whatszap-read-leads', JSON.stringify([...readLeads]))
+    }
+  }, [readLeads, mounted])
 
   // Check WhatsApp connection
   useEffect(() => {
@@ -124,8 +580,54 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [])
 
+  // Auto-refresh leads on mount to get latest data (names, unread, photos)
+  useEffect(() => {
+    if (mounted && isConnected) {
+      // Silently refresh data from API
+      const refreshLeads = async () => {
+        try {
+          const res = await fetch('/api/leads')
+          const data = await res.json()
+          
+          if (data.success && data.contacts) {
+            setLeads(prev => {
+              const existingMap = new Map(prev.map(l => [l.id, l]))
+              
+              for (const contact of data.contacts) {
+                const id = `wa_${contact.phone}`
+                const existing = existingMap.get(id)
+                const updatedLead: Lead = {
+                  id,
+                  name: contact.name || contact.phone,
+                  phone: contact.phone,
+                  status: existing?.status || 'novo',
+                  source: 'whatsapp',
+                  whatsappId: contact.id,
+                  unreadCount: contact.unreadCount || 0,
+                  lastMessage: contact.lastMessage || '',
+                  profilePicUrl: contact.profilePicUrl || null,
+                  createdAt: existing?.createdAt || new Date().toISOString(),
+                }
+                existingMap.set(id, updatedLead)
+              }
+              
+              return Array.from(existingMap.values())
+            })
+          }
+        } catch (err) {
+          console.error('Failed to refresh leads:', err)
+        }
+      }
+      
+      refreshLeads()
+    }
+  }, [mounted, isConnected])
+
   // Import contacts with conversations from database
   const importFromWhatsApp = async () => {
+    // Bug fix #27: Guard against concurrent imports
+    if (isImporting) return
+    
     setIsImporting(true)
     setImportError(null)
     try {
@@ -134,41 +636,95 @@ export default function Dashboard() {
       const data = await res.json()
       
       if (data.success && data.contacts) {
-        const newLeads: Lead[] = data.contacts.map((contact: any) => ({
+        const apiLeads: Lead[] = data.contacts.map((contact: any) => ({
           id: `wa_${contact.phone}`,
           name: contact.name || contact.phone,
           phone: contact.phone,
           status: 'novo' as LeadStatus,
           source: 'whatsapp' as LeadSource,
           whatsappId: contact.id,
+          unreadCount: contact.unreadCount || 0,
+          lastMessage: contact.lastMessage || '',
+          profilePicUrl: contact.profilePicUrl || null,
+          createdAt: new Date().toISOString(),
         }))
         
+        // Bug fix #7: Atualizar leads existentes e adicionar novos (sem duplicar)
+        let newCount = 0
+        let updatedCount = 0
+        
         setLeads(prev => {
-          const existingIds = new Set(prev.map(l => l.id))
-          const uniqueNew = newLeads.filter(l => !existingIds.has(l.id))
-          return [...prev, ...uniqueNew]
+          const existingMap = new Map(prev.map(l => [l.id, l]))
+          
+          // Atualizar existentes com novos dados (mantendo status e createdAt)
+          for (const apiLead of apiLeads) {
+            const existing = existingMap.get(apiLead.id)
+            if (existing) {
+              existingMap.set(apiLead.id, {
+                ...apiLead,
+                status: existing.status,
+                tags: existing.tags, // Preservar tags
+                value: existing.value, // Preservar valor
+                reminderDate: existing.reminderDate, // Preservar lembrete
+                reminderNote: existing.reminderNote,
+                createdAt: existing.createdAt || apiLead.createdAt,
+              })
+              updatedCount++
+            } else {
+              existingMap.set(apiLead.id, apiLead)
+              newCount++
+            }
+          }
+          
+          return Array.from(existingMap.values())
         })
         
-        console.log(`Imported ${newLeads.length} contacts with conversations`)
+        // Feedback melhorado
+        if (newCount > 0 && updatedCount > 0) {
+          showToast(`${newCount} novos + ${updatedCount} atualizados`, 'success')
+        } else if (newCount > 0) {
+          showToast(`${newCount} leads importados`, 'success')
+        } else if (updatedCount > 0) {
+          showToast(`${updatedCount} leads atualizados`, 'info')
+        } else {
+          showToast('Nenhum lead novo encontrado', 'info')
+        }
+        
+        console.log(`Imported ${newCount} new, updated ${updatedCount} contacts`)
       } else {
         // Fallback: buscar da Evolution API
         const res2 = await fetch('/api/whatsapp/import-chats', { method: 'POST' })
         const data2 = await res2.json()
         
         if (data2.success && data2.leads) {
-          const newLeads: Lead[] = data2.leads.slice(0, 200).map((lead: any) => ({
+          const apiLeads: Lead[] = data2.leads.slice(0, 200).map((lead: any) => ({
             id: `wa_${lead.phone}`,
             name: lead.name || lead.phone,
             phone: lead.phone,
             status: 'novo' as LeadStatus,
             source: 'whatsapp' as LeadSource,
             whatsappId: lead.whatsappId,
+            unreadCount: lead.unreadCount || 0,
+            lastMessage: lead.lastMessage || '',
+            profilePicUrl: lead.profilePicUrl || null,
+            createdAt: new Date().toISOString(),
           }))
           
           setLeads(prev => {
-            const existingIds = new Set(prev.map(l => l.id))
-            const uniqueNew = newLeads.filter(l => !existingIds.has(l.id))
-            return [...prev, ...uniqueNew]
+            const existingMap = new Map(prev.map(l => [l.id, l]))
+            for (const apiLead of apiLeads) {
+              const existing = existingMap.get(apiLead.id)
+              if (existing) {
+                existingMap.set(apiLead.id, { 
+                  ...apiLead, 
+                  status: existing.status,
+                  createdAt: existing.createdAt || apiLead.createdAt,
+                })
+              } else {
+                existingMap.set(apiLead.id, apiLead)
+              }
+            }
+            return Array.from(existingMap.values())
           })
         } else {
           setImportError(data2.error || 'Falha ao importar contatos')
@@ -207,10 +763,75 @@ export default function Dashboard() {
     setLeads(prev => prev.map(lead => 
       lead.id === id ? { ...lead, status: newStatus } : lead
     ))
+    
+    // BUG #8 FIX: Persistir status no Supabase
+    const lead = leads.find(l => l.id === id)
+    if (lead) {
+      fetch('/api/leads/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: lead.phone, status: newStatus }),
+      }).catch(err => console.error('Failed to persist status:', err))
+    }
+  }
+
+  const [draggedLead, setDraggedLead] = useState<string | null>(null)
+  const [showDeleteZone, setShowDeleteZone] = useState(false)
+  
+  // Mobile: apenas onClick funciona (sem touch drag por enquanto)
+
+  // Bug fix #4: Mostrar modal de confirmação ao invés de confirm() nativo
+  const confirmDeleteLead = (lead: Lead) => {
+    setShowDeleteConfirm(lead)
+  }
+  
+  const deleteLead = (id: string) => {
+    const lead = leads.find(l => l.id === id)
+    setLeads(prev => prev.filter(lead => lead.id !== id))
+    // Bug fix: Also remove from readLeads to clean up localStorage
+    setReadLeads(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(id)
+      return newSet
+    })
+    if (selectedLead?.id === id) {
+      setSelectedLead(null)
+      setShowChat(false)
+    }
+    // BUG #8 FIX: Remover status do Supabase
+    if (lead) {
+      fetch('/api/leads/status', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: lead.phone }),
+      }).catch(err => console.error('Failed to delete status:', err))
+    }
+    showToast('Lead removido', 'info')
+    setShowDeleteConfirm(null)
   }
 
   const handleDragStart = (e: React.DragEvent, lead: Lead) => {
     e.dataTransfer.setData('leadId', lead.id)
+    e.dataTransfer.effectAllowed = 'move'
+    setDraggedLead(lead.id)
+    setShowDeleteZone(true)
+  }
+
+  const handleDragEnd = () => {
+    setDraggedLead(null)
+    setShowDeleteZone(false)
+  }
+
+  const handleDropDelete = (e: React.DragEvent) => {
+    e.preventDefault()
+    const leadId = e.dataTransfer.getData('leadId')
+    if (leadId) {
+      const lead = leads.find(l => l.id === leadId)
+      if (lead) {
+        confirmDeleteLead(lead)
+      }
+    }
+    setShowDeleteZone(false)
   }
 
   const handleDrop = (e: React.DragEvent, status: LeadStatus) => {
@@ -226,6 +847,49 @@ export default function Dashboard() {
   const handleCardClick = (lead: Lead) => {
     setSelectedLead(lead)
     setShowChat(true)
+    
+    // Marcar como lido (adicionar ao Set de lidos)
+    if (lead.unreadCount && lead.unreadCount > 0 && !readLeads.has(lead.id)) {
+      setReadLeads(prev => new Set([...prev, lead.id]))
+    }
+  }
+  
+  // Helper para verificar se lead tem mensagens não lidas (considerando readLeads)
+  const hasUnreadMessages = (lead: Lead) => {
+    return (lead.unreadCount || 0) > 0 && !readLeads.has(lead.id)
+  }
+
+  // Pull to refresh handlers
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (window.scrollY === 0) {
+      pullStartY.current = e.touches[0].clientY
+    }
+  }
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (pullStartY.current === 0 || isSyncing) return
+    const currentY = e.touches[0].clientY
+    const diff = currentY - pullStartY.current
+    if (diff > 0 && window.scrollY === 0) {
+      setPullDistance(Math.min(diff * 0.5, 80))
+      if (diff > 100) {
+        setIsPulling(true)
+      }
+    }
+  }
+
+  const handleTouchEnd = async () => {
+    if (isPulling && isConnected && !isSyncing) {
+      // Haptic feedback on refresh
+      if ('vibrate' in navigator) {
+        navigator.vibrate([10, 50, 10])
+      }
+      await syncMessages()
+      showToast('Atualizado ✓', 'success')
+    }
+    setPullDistance(0)
+    setIsPulling(false)
+    pullStartY.current = 0
   }
 
   if (!mounted) {
@@ -236,39 +900,197 @@ export default function Dashboard() {
     )
   }
 
-  const filteredLeads = leads.filter(lead => 
-    lead.name.toLowerCase().includes(search.toLowerCase()) ||
-    lead.phone.includes(search)
-  )
+  // Helper to normalize text (remove accents)
+  const normalizeText = (text: string) => 
+    text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  
+  // Date filter helper
+  const isInDateRange = (lead: Lead) => {
+    if (dateFilter === 'all') return true
+    const createdAt = lead.createdAt ? new Date(lead.createdAt) : new Date()
+    const now = new Date()
+    const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
+    if (dateFilter === 'today') return diffDays === 0
+    if (dateFilter === '7days') return diffDays <= 7
+    if (dateFilter === '30days') return diffDays <= 30
+    return true
+  }
+  
+  const filteredLeads = leads.filter(lead => {
+    // Bug fix #24: Trim search to avoid false negatives with leading/trailing spaces
+    const searchTrimmed = search.trim()
+    const searchNorm = normalizeText(searchTrimmed)
+    const searchDigits = searchTrimmed.replace(/\D/g, '')
+    // Bug fix #13: Normalize phone search (search "5511" matches "+55 11 99999-0000")
+    const matchesSearch = !searchTrimmed || normalizeText(lead.name).includes(searchNorm) || 
+      (searchDigits.length > 0 ? lead.phone.replace(/\D/g, '').includes(searchDigits) : lead.phone.includes(searchTrimmed))
+    const matchesDate = isInDateRange(lead)
+    const matchesTag = !tagFilter || lead.tags?.includes(tagFilter)
+    return matchesSearch && matchesDate && matchesTag
+  })
 
   const getLeadsByStatus = (status: LeadStatus) => 
     filteredLeads.filter(lead => lead.status === status)
+    
+  // Metrics calculations
+  const metrics = {
+    total: leads.length,
+    novos: leads.filter(l => l.status === 'novo').length,
+    emContato: leads.filter(l => l.status === 'em_contato').length,
+    negociando: leads.filter(l => l.status === 'negociando').length,
+    fechados: leads.filter(l => l.status === 'fechado').length,
+    perdidos: leads.filter(l => l.status === 'perdido').length,
+    valorTotal: leads.filter(l => l.status === 'fechado').reduce((acc, l) => acc + (l.value || 0), 0),
+    taxaConversao: leads.length > 0 ? Math.round((leads.filter(l => l.status === 'fechado').length / leads.length) * 100) : 0,
+  }
+  
+  // Get pending reminders
+  const pendingReminders = leads
+    .filter(l => l.reminderDate && new Date(l.reminderDate) <= new Date(Date.now() + 24 * 60 * 60 * 1000))
+    .sort((a, b) => new Date(a.reminderDate!).getTime() - new Date(b.reminderDate!).getTime())
+  
+  // Add reminder to lead
+  const addReminder = (leadId: string, date: string, note: string) => {
+    // Bug fix #2: Validar data no passado e tempo mínimo de 5 minutos
+    const reminderDateTime = new Date(date)
+    const now = new Date()
+    const minTime = new Date(now.getTime() + 5 * 60 * 1000) // 5 minutes from now
+    
+    if (reminderDateTime < now) {
+      showToast('Data não pode ser no passado', 'error')
+      return
+    }
+    
+    if (reminderDateTime < minTime) {
+      showToast('Lembrete deve ser pelo menos 5 minutos no futuro', 'error')
+      return
+    }
+    
+    setLeads(prev => prev.map(l => 
+      l.id === leadId ? { ...l, reminderDate: date, reminderNote: note } : l
+    ))
+    setShowReminderModal(false)
+    setReminderLead(null)
+    setReminderDate('')
+    setReminderNote('')
+    showToast('Lembrete criado ✓', 'success')
+  }
+  
+  // Clear reminder
+  const clearReminder = (leadId: string) => {
+    setLeads(prev => prev.map(l => 
+      l.id === leadId ? { ...l, reminderDate: undefined, reminderNote: undefined } : l
+    ))
+    showToast('Lembrete removido', 'info')
+  }
+  
+  // Toggle tag on lead (only 1 per category)
+  const toggleTag = (leadId: string, tag: string) => {
+    const category = getTagCategory(tag)
+    let wasAdded = false
+    
+    setLeads(prev => prev.map(l => {
+      if (l.id !== leadId) return l
+      const currentTags = l.tags || []
+      const hasTag = currentTags.includes(tag)
+      
+      let newTags: string[]
+      if (hasTag) {
+        // Remove tag
+        newTags = currentTags.filter(t => t !== tag)
+      } else {
+        // Add tag, but first remove other tags from same category
+        const tagsWithoutSameCategory = category 
+          ? currentTags.filter(t => getTagCategory(t) !== category)
+          : currentTags
+        newTags = [...tagsWithoutSameCategory, tag]
+        wasAdded = true
+      }
+      
+      // Also update tagLead state for immediate modal feedback
+      if (tagLead && tagLead.id === leadId) {
+        setTagLead({ ...tagLead, tags: newTags })
+      }
+      
+      return { ...l, tags: newTags }
+    }))
+    
+    // Haptic feedback on mobile
+    if ('vibrate' in navigator) {
+      navigator.vibrate(wasAdded ? 10 : 5)
+    }
+  }
+  
+  // Update lead value
+  const updateLeadValue = (leadId: string, value: number) => {
+    setLeads(prev => prev.map(l => 
+      l.id === leadId ? { ...l, value } : l
+    ))
+  }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div 
+      className="h-screen bg-background flex overflow-hidden"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull to Refresh Indicator */}
+      {pullDistance > 0 && (
+        <div 
+          className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center bg-green-50 transition-all"
+          style={{ height: pullDistance }}
+        >
+          <div className={`flex items-center gap-2 text-green-600 text-sm ${isPulling ? 'scale-110' : ''} transition-transform`}>
+            <RefreshCw className={`w-4 h-4 ${isPulling ? 'animate-spin' : ''}`} />
+            <span>{isPulling ? 'Solte para atualizar' : 'Puxe para atualizar'}</span>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Header */}
         <header className="sticky top-0 z-50 backdrop-blur-lg bg-background/80 border-b border-border/50">
           <div className="px-3 h-12 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <Link href="/" className="flex items-center gap-1.5 hover:opacity-80 transition">
-                <div className="w-6 h-6 rounded-md bg-green-500 flex items-center justify-center">
-                  <MessageCircle className="w-3 h-3 text-white" />
+                <div className="relative">
+                  <img src="/logo.png" alt="CRMzap" className="w-6 h-6 rounded-md" />
+                  {/* Unread counter badge */}
+                  {(() => {
+                    const unreadCount = leads.filter(l => (l.unreadCount || 0) > 0 && !readLeads.has(l.id)).length
+                    return unreadCount > 0 ? (
+                      <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    ) : null
+                  })()}
                 </div>
-                <span className="font-bold text-sm hidden sm:inline">WhatsZap</span>
+                <span className="font-bold text-sm hidden sm:inline">CRMzap</span>
               </Link>
             </div>
             
+            {/* Bug fix #12: Campo de busca melhorado com botão de limpar */}
             <div className="flex-1 max-w-xs">
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
                 <Input 
-                  placeholder="Buscar..." 
-                  className="pl-7 h-7 text-xs"
+                  placeholder="Buscar leads..." 
+                  className="pl-7 pr-7 h-7 text-xs"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
+                  aria-label="Buscar leads"
                 />
+                {search && (
+                  <button
+                    onClick={() => setSearch('')}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center"
+                    aria-label="Limpar busca"
+                  >
+                    <X className="w-3 h-3 text-muted-foreground" />
+                  </button>
+                )}
               </div>
             </div>
             
@@ -282,39 +1104,6 @@ export default function Dashboard() {
                   {isConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
                 </Button>
               </Link>
-              
-              {isConnected && (
-                <>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    className="h-7 text-xs px-2"
-                    onClick={syncMessages}
-                    disabled={isSyncing}
-                    title="Sincronizar mensagens"
-                  >
-                    {isSyncing ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <RefreshCw className="w-3 h-3" />
-                    )}
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    className="h-7 text-xs px-2"
-                    onClick={importFromWhatsApp}
-                    disabled={isImporting}
-                    title="Importar contatos"
-                  >
-                    {isImporting ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
-                    ) : (
-                      <Download className="w-3 h-3" />
-                    )}
-                  </Button>
-                </>
-              )}
 
               <Button 
                 variant="ghost" 
@@ -324,6 +1113,62 @@ export default function Dashboard() {
               >
                 {showChat ? <PanelRightClose className="w-3.5 h-3.5" /> : <PanelRightOpen className="w-3.5 h-3.5" />}
               </Button>
+
+              {/* User Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 gap-1.5 px-2">
+                    <Avatar className="h-5 w-5">
+                      <AvatarImage src={user?.avatarUrl} />
+                      <AvatarFallback className="text-[10px] bg-green-100 text-green-700">
+                        {user?.name?.substring(0, 2).toUpperCase() || 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="text-xs font-medium hidden sm:inline max-w-[80px] truncate">
+                      {user?.name || 'Usuário'}
+                    </span>
+                    <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col">
+                      <span className="font-medium">{user?.name || 'Usuário'}</span>
+                      <span className="text-xs text-muted-foreground font-normal">{user?.email}</span>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <Link href="/profile">
+                    <DropdownMenuItem>
+                      <User className="mr-2 h-4 w-4" />
+                      Meu Perfil
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/subscription">
+                    <DropdownMenuItem>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Assinatura
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/reminders">
+                    <DropdownMenuItem>
+                      <Bell className="mr-2 h-4 w-4" />
+                      Lembretes
+                    </DropdownMenuItem>
+                  </Link>
+                  <Link href="/settings">
+                    <DropdownMenuItem>
+                      <Settings className="mr-2 h-4 w-4" />
+                      Configurações
+                    </DropdownMenuItem>
+                  </Link>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Sair
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </header>
@@ -335,115 +1180,332 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Stats Bar */}
-        <div className="border-b border-border/50 bg-muted/30 px-3 py-1.5">
-          <div className="flex items-center gap-3 text-xs">
-            <div>
-              <span className="text-muted-foreground">Total </span>
-              <span className="font-bold">{leads.length}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Novos </span>
-              <span className="font-bold text-blue-600">{getLeadsByStatus('novo').length}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Negociando </span>
-              <span className="font-bold text-purple-600">{getLeadsByStatus('negociando').length}</span>
-            </div>
-            <div>
-              <span className="text-muted-foreground">Fechados </span>
-              <span className="font-bold text-green-600">{getLeadsByStatus('fechado').length}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Empty State */}
-        {leads.length === 0 && (
-          <div className="flex-1 flex items-center justify-center p-4">
-            <div className="text-center max-w-xs">
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center mx-auto mb-2">
-                <MessageCircle className="w-5 h-5 text-muted-foreground" />
+        {/* Pending Reminders Alert */}
+        {pendingReminders.length > 0 && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 px-3 py-2">
+            <div className="flex items-center gap-2 text-xs">
+              <Bell className="w-4 h-4 text-amber-500" />
+              <span className="text-amber-200 font-medium">
+                {pendingReminders.length} lembrete{pendingReminders.length > 1 ? 's' : ''} pendente{pendingReminders.length > 1 ? 's' : ''}:
+              </span>
+              <div className="flex items-center gap-2 overflow-x-auto">
+                {pendingReminders.slice(0, 3).map(lead => (
+                  <button
+                    key={lead.id}
+                    onClick={() => {
+                      setSelectedLead(lead)
+                      setShowChat(true)
+                    }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 hover:bg-amber-500/30 transition whitespace-nowrap"
+                  >
+                    <Clock className="w-3 h-3" />
+                    {lead.name}
+                    <X 
+                      className="w-3 h-3 hover:text-amber-100" 
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        clearReminder(lead.id)
+                      }}
+                    />
+                  </button>
+                ))}
               </div>
-              <h2 className="text-sm font-semibold mb-1">Nenhum lead</h2>
-              <p className="text-muted-foreground text-xs mb-3">
-                {isConnected ? 'Importe seus contatos.' : 'Conecte o WhatsApp.'}
-              </p>
-              {isConnected ? (
-                <Button 
-                  onClick={importFromWhatsApp}
-                  disabled={isImporting}
-                  size="sm"
-                  className="h-7 text-xs bg-green-500 hover:bg-green-600 text-white"
-                >
-                  {isImporting ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Download className="w-3 h-3 mr-1" />}
-                  Importar
-                </Button>
-              ) : (
-                <Link href="/connect">
-                  <Button size="sm" className="h-7 text-xs bg-green-500 hover:bg-green-600 text-white">
-                    <Wifi className="w-3 h-3 mr-1" />
-                    Conectar
-                  </Button>
-                </Link>
-              )}
             </div>
           </div>
         )}
 
+        {/* Metrics & Filters Bar - Unified */}
+        <div className="border-b border-border/50 bg-muted/10 px-3 py-2">
+          <div className="flex items-center justify-between">
+            {/* Metrics - All in one row */}
+            <div className="flex items-center gap-4 text-xs overflow-x-auto">
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-base">{metrics.total}</span>
+                <span className="text-muted-foreground">Total</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-base text-blue-600">{metrics.novos}</span>
+                <span className="text-muted-foreground">Novos</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-base text-purple-600">{metrics.negociando}</span>
+                <span className="text-muted-foreground">Negociando</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-base text-green-600">{metrics.fechados}</span>
+                <span className="text-muted-foreground">Fechados</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-base text-blue-500">{metrics.taxaConversao}%</span>
+                <span className="text-muted-foreground">Conversão</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-base text-emerald-500">R$ {metrics.valorTotal.toLocaleString('pt-BR')}</span>
+                <span className="text-muted-foreground">Faturado</span>
+              </div>
+            </div>
+            
+            {/* Bug fix #6: Filters com contadores */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Date Filter */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs px-2 gap-1">
+                    <Calendar className="w-3 h-3" />
+                    {dateFilter === 'all' ? 'Todos' : dateFilter === 'today' ? 'Hoje' : dateFilter === '7days' ? '7 dias' : '30 dias'}
+                    {dateFilter !== 'all' && (
+                      <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                        {leads.filter(l => {
+                          const created = l.createdAt ? new Date(l.createdAt) : new Date()
+                          const now = new Date()
+                          const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
+                          if (dateFilter === 'today') return diffDays === 0
+                          if (dateFilter === '7days') return diffDays <= 7
+                          if (dateFilter === '30days') return diffDays <= 30
+                          return true
+                        }).length}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setDateFilter('all')}>
+                    Todos <span className="ml-auto text-muted-foreground">{leads.length}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setDateFilter('today')}>
+                    Hoje <span className="ml-auto text-muted-foreground">{leads.filter(l => {
+                      const created = l.createdAt ? new Date(l.createdAt) : new Date()
+                      return created.toDateString() === new Date().toDateString()
+                    }).length}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setDateFilter('7days')}>
+                    Últimos 7 dias <span className="ml-auto text-muted-foreground">{leads.filter(l => {
+                      const created = l.createdAt ? new Date(l.createdAt) : new Date()
+                      const diffDays = Math.floor((new Date().getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
+                      return diffDays <= 7
+                    }).length}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setDateFilter('30days')}>
+                    Últimos 30 dias <span className="ml-auto text-muted-foreground">{leads.filter(l => {
+                      const created = l.createdAt ? new Date(l.createdAt) : new Date()
+                      const diffDays = Math.floor((new Date().getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
+                      return diffDays <= 30
+                    }).length}</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              {/* Tag Filter */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs px-2 gap-1">
+                    <Tag className="w-3 h-3" />
+                    {tagFilter ? tagFilter.split(': ')[1] || tagFilter : 'Tags'}
+                    {tagFilter && (
+                      <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                        {leads.filter(l => l.tags?.includes(tagFilter)).length}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setTagFilter(null)}>
+                    Todas <span className="ml-auto text-muted-foreground">{leads.length}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {TAG_OPTIONS.map(tag => {
+                    const count = leads.filter(l => l.tags?.includes(tag.label)).length
+                    return (
+                      <DropdownMenuItem key={tag.label} onClick={() => setTagFilter(tag.label)}>
+                        {tag.label} <span className="ml-auto text-muted-foreground">{count}</span>
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
+              {/* Reports Button */}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="h-6 text-xs px-2 gap-1 border-blue-300 text-blue-600 hover:bg-blue-50"
+                onClick={() => setShowReportsModal(true)}
+              >
+                <BarChart3 className="w-3 h-3" />
+                Relatórios
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Loading Skeleton */}
+        {isLoadingLeads && (
+          <div className="flex-1 overflow-hidden">
+            <DashboardSkeleton />
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!isLoadingLeads && leads.length === 0 && (
+          <div className="flex-1 flex items-center justify-center">
+            <EmptyState 
+              type={isConnected ? 'no-leads' : 'not-connected'}
+              onAction={isConnected ? importFromWhatsApp : () => router.push('/connect')}
+              actionLabel={isConnected ? 'Importar Contatos' : 'Conectar WhatsApp'}
+            />
+          </div>
+        )}
+
         {/* Kanban Board */}
-        {leads.length > 0 && (
-          <div className="flex-1 overflow-x-auto p-2 pb-4">
+        {!isLoadingLeads && leads.length > 0 && (
+          <div className="flex-1 overflow-x-auto overflow-y-hidden p-2 pb-4">
             <div className="flex gap-2 h-full" style={{ minWidth: 'max-content', paddingRight: '8px' }}>
-              {statusOrder.map((status) => {
-                const config = statusConfig[status]
+              {kanbanColumns.filter(col => col.visible).map((column) => {
+                const status = column.id as LeadStatus
                 const statusLeads = getLeadsByStatus(status)
                 
                 return (
                   <div 
                     key={status}
                     className="flex-shrink-0 w-40 flex flex-col"
+                    data-status={status}
                     onDragOver={handleDragOver}
                     onDrop={(e) => handleDrop(e, status)}
                   >
-                    <div className={`rounded-md border ${config.bgColor} p-1.5 mb-1`}>
+                    <div className={`rounded-md border ${column.bgColor} p-1.5 mb-1`}>
                       <div className="flex items-center gap-1">
-                        <span className={`font-semibold text-xs ${config.color}`}>{config.label}</span>
+                        <span className={`font-semibold text-xs ${column.color}`}>{column.label}</span>
                         <Badge variant="secondary" className="text-[10px] h-4 px-1">
                           {statusLeads.length}
                         </Badge>
                       </div>
                     </div>
                     
-                    <ScrollArea className="flex-1 max-h-[70vh]">
-                      <div className="space-y-1 pr-1">
-                        {statusLeads.map((lead) => (
-                          <Card 
-                            key={lead.id}
-                            className={`p-1.5 cursor-pointer hover:shadow-md transition ${
-                              selectedLead?.id === lead.id ? 'ring-2 ring-green-500' : ''
-                            }`}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, lead)}
-                            onClick={() => handleCardClick(lead)}
-                          >
-                            <div className="flex items-center gap-1.5">
-                              <div className="relative shrink-0">
-                                <Avatar className="h-6 w-6">
-                                  <AvatarFallback className="bg-gray-100 text-gray-600 font-medium text-[9px]">
-                                    {lead.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5">
-                                  <SourceIcon source={lead.source || 'whatsapp'} className="w-2.5 h-2.5" />
+                    <div className="flex-1 overflow-y-auto">
+                      <div className="space-y-1">
+                        {statusLeads.map((lead) => {
+                          const hasUnread = hasUnreadMessages(lead)
+                          return (
+                            <Card 
+                              key={lead.id}
+                              className={`${settings.compactView ? 'p-1' : 'p-1.5'} cursor-pointer hover:shadow-md transition-all active:scale-[0.98] active:bg-gray-100 group relative ${
+                                selectedLead?.id === lead.id 
+                                  ? 'ring-2 ring-green-500' 
+                                  : hasUnread 
+                                    ? 'bg-green-50 border-green-300 shadow-sm' 
+                                    : ''
+                              }`}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, lead)}
+                              onDragEnd={handleDragEnd}
+                              onClick={() => handleCardClick(lead)}
+                            >
+                              <div className={`flex items-center ${settings.compactView ? 'gap-1' : 'gap-1.5'}`}>
+                                <div className="relative shrink-0">
+                                  <Avatar className={`${settings.compactView ? 'h-5 w-5' : 'h-6 w-6'} ${hasUnread ? 'ring-2 ring-green-400' : ''}`}>
+                                    {lead.profilePicUrl && (
+                                      <AvatarImage src={lead.profilePicUrl} alt={lead.name} />
+                                    )}
+                                    <AvatarFallback className={`font-medium ${settings.compactView ? 'text-[8px]' : 'text-[9px]'} ${
+                                      hasUnread 
+                                        ? 'bg-green-500 text-white' 
+                                        : 'bg-gray-100 text-gray-600'
+                                    }`}>
+                                      {lead.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="absolute -bottom-0.5 -right-0.5 bg-white rounded-full p-0.5">
+                                    <SourceIcon source={lead.source || 'whatsapp'} className={settings.compactView ? 'w-2 h-2' : 'w-2.5 h-2.5'} />
+                                  </div>
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1">
+                                    <h3 className={`${settings.compactView ? 'text-[10px]' : 'text-[11px]'} truncate leading-tight ${
+                                      hasUnread ? 'font-bold' : 'font-medium'
+                                    }`}>{lead.name}</h3>
+                                    {hasUnread && (
+                                      <span className={`flex-shrink-0 ${settings.compactView ? 'w-3.5 h-3.5 text-[7px]' : 'w-4 h-4 text-[8px]'} bg-green-500 text-white rounded-full flex items-center justify-center font-bold`}>
+                                        {lead.unreadCount! > 9 ? '9+' : lead.unreadCount}
+                                      </span>
+                                    )}
+                                    {lead.reminderDate && (
+                                      <div className="relative group/reminder">
+                                        <Bell className={`${settings.compactView ? 'w-2.5 h-2.5' : 'w-3 h-3'} text-amber-500 cursor-help`} />
+                                        <div className="absolute bottom-full left-0 mb-1 hidden group-hover/reminder:block z-50">
+                                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 shadow-lg min-w-[160px] text-[10px]">
+                                            <div className="font-semibold text-amber-700 mb-1">🔔 Lembrete</div>
+                                            <div className="text-amber-600">
+                                              {new Date(lead.reminderDate).toLocaleString('pt-BR', { 
+                                                day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+                                              })}
+                                            </div>
+                                            {lead.reminderNote && (
+                                              <div className="text-amber-800 mt-1 italic">"{lead.reminderNote}"</div>
+                                            )}
+                                            <button 
+                                              onClick={(e) => { e.stopPropagation(); clearReminder(lead.id) }}
+                                              className="mt-1.5 text-red-500 hover:text-red-700 text-[9px]"
+                                            >
+                                              ✕ Remover
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {!settings.compactView && (
+                                    <p className={`text-[9px] truncate ${
+                                      hasUnread ? 'text-green-700' : 'text-muted-foreground'
+                                    }`}>{lead.lastMessage || lead.phone}</p>
+                                  )}
                                 </div>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-medium text-[11px] truncate leading-tight">{lead.name}</h3>
-                                <p className="text-[9px] text-muted-foreground truncate">{lead.phone}</p>
+                              {/* Tags - hidden in compact view */}
+                              {!settings.compactView && lead.tags && lead.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-0.5 mt-1">
+                                  {lead.tags.slice(0, 2).map(tag => (
+                                    <span key={tag} className={`text-[8px] px-1 py-0.5 rounded border ${getTagColor(tag)}`}>
+                                      {tag.split(': ')[1] || tag}
+                                    </span>
+                                  ))}
+                                  {lead.tags.length > 2 && (
+                                    <span className="text-[8px] text-muted-foreground">+{lead.tags.length - 2}</span>
+                                  )}
+                                </div>
+                              )}
+                              {/* Quick Actions (on hover) */}
+                              <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition flex gap-0.5">
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setTagLead(lead)
+                                    setShowTagModal(true)
+                                  }}
+                                  className="p-1 rounded bg-background/80 hover:bg-muted transition"
+                                  title="Gerenciar tags"
+                                >
+                                  <Tag className="w-3 h-3" />
+                                </button>
+                                {!lead.reminderDate && (
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setReminderLead(lead)
+                                      // Bug fix #4: Pre-populate with existing reminder data
+                                      setReminderDate(lead.reminderDate || '')
+                                      setReminderNote(lead.reminderNote || '')
+                                      setShowReminderModal(true)
+                                    }}
+                                    className="p-1 rounded bg-background/80 hover:bg-muted transition"
+                                    title="Criar lembrete"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                )}
                               </div>
-                            </div>
-                          </Card>
-                        ))}
+                            </Card>
+                          )
+                        })}
                         
                         {statusLeads.length === 0 && (
                           <div className="text-center py-4 text-muted-foreground text-[9px] border border-dashed rounded-md">
@@ -451,26 +1513,410 @@ export default function Dashboard() {
                           </div>
                         )}
                       </div>
-                    </ScrollArea>
+                    </div>
                   </div>
                 )
               })}
+              
+              {/* Lembretes Hoje - Column (Bug fix #19: separate passed vs pending) */}
+              <div className="flex-shrink-0 w-44 flex flex-col">
+                <div className="rounded-md border bg-amber-50 border-amber-200 p-1.5 mb-1">
+                  <div className="flex items-center gap-1">
+                    <Bell className="w-3 h-3 text-amber-600" />
+                    <span className="font-semibold text-xs text-amber-700">Lembretes Hoje</span>
+                    <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-amber-100 text-amber-700">
+                      {leads.filter(l => {
+                        if (!l.reminderDate) return false
+                        const reminderDate = new Date(l.reminderDate)
+                        const today = new Date()
+                        return reminderDate.toDateString() === today.toDateString()
+                      }).length}
+                    </Badge>
+                  </div>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto">
+                  <div className="space-y-1">
+                    {(() => {
+                      const now = new Date()
+                      const todayReminders = leads.filter(l => {
+                        if (!l.reminderDate) return false
+                        const reminderDate = new Date(l.reminderDate)
+                        return reminderDate.toDateString() === now.toDateString()
+                      }).sort((a, b) => new Date(a.reminderDate!).getTime() - new Date(b.reminderDate!).getTime())
+                      
+                      const passedReminders = todayReminders.filter(l => new Date(l.reminderDate!) < now)
+                      const pendingReminders = todayReminders.filter(l => new Date(l.reminderDate!) >= now)
+                      
+                      return (
+                        <>
+                          {/* Pending reminders first */}
+                          {pendingReminders.map(lead => (
+                            <Card 
+                              key={`reminder-${lead.id}`}
+                              className="p-2 cursor-pointer hover:shadow-md transition-all bg-amber-50/50 border-amber-200"
+                              onClick={() => handleCardClick(lead)}
+                            >
+                              <div className="flex items-start gap-1.5">
+                                <Bell className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="text-[10px] font-medium truncate">{lead.name}</h4>
+                                  <div className="text-[9px] text-amber-600 font-medium">
+                                    {new Date(lead.reminderDate!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                  {lead.reminderNote && (
+                                    <p className="text-[8px] text-muted-foreground truncate mt-0.5">
+                                      {lead.reminderNote}
+                                    </p>
+                                  )}
+                                </div>
+                                <button 
+                                  onClick={(e) => { e.stopPropagation(); clearReminder(lead.id) }}
+                                  className="text-amber-400 hover:text-red-500 transition"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </Card>
+                          ))}
+                          
+                          {/* Passed reminders with visual distinction */}
+                          {passedReminders.length > 0 && (
+                            <div className="pt-1 mt-1 border-t border-amber-200/50">
+                              <p className="text-[8px] text-muted-foreground mb-1 px-1">Passados</p>
+                              {passedReminders.map(lead => (
+                                <Card 
+                                  key={`reminder-passed-${lead.id}`}
+                                  className="p-2 cursor-pointer hover:shadow-md transition-all bg-gray-50 border-gray-200 opacity-60"
+                                  onClick={() => handleCardClick(lead)}
+                                >
+                                  <div className="flex items-start gap-1.5">
+                                    <AlertCircle className="w-3 h-3 text-gray-400 mt-0.5 flex-shrink-0" />
+                                    <div className="flex-1 min-w-0">
+                                      <h4 className="text-[10px] font-medium truncate text-gray-600">{lead.name}</h4>
+                                      <div className="text-[9px] text-gray-500 line-through">
+                                        {new Date(lead.reminderDate!).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                      </div>
+                                    </div>
+                                    <button 
+                                      onClick={(e) => { e.stopPropagation(); clearReminder(lead.id) }}
+                                      className="text-gray-400 hover:text-red-500 transition"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                </Card>
+                              ))}
+                            </div>
+                          )}
+                          
+                          {todayReminders.length === 0 && (
+                            <div className="text-center py-6 text-muted-foreground text-[9px]">
+                              <Bell className="w-6 h-6 mx-auto mb-1 text-amber-300" />
+                              <p>Nenhum lembrete para hoje</p>
+                            </div>
+                          )}
+                        </>
+                      )
+                    })()}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
+
+        {/* Delete Zone - appears when dragging */}
+        {showDeleteZone && (
+          <div 
+            className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50"
+            data-delete-zone="true"
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
+            onDrop={handleDropDelete}
+          >
+            <div className="flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-full shadow-lg animate-pulse">
+              <Trash2 className="w-5 h-5" />
+              <span className="font-medium">Solte aqui para remover</span>
+            </div>
+          </div>
+        )}
+        
+        {/* Mobile: drag desabilitado por enquanto, apenas tap para abrir chat */}
       </div>
 
-      {/* Chat Panel */}
+      {/* Chat Panel - controlled by showChat state */}
       {showChat && (
-        <div className="w-72 border-l bg-background flex-shrink-0 hidden md:block">
-          <ChatPanel 
-            lead={selectedLead} 
-            onClose={() => {
-              setSelectedLead(null)
-            }} 
-          />
+        <ChatPanelWrapper
+          isMobile={isMobile}
+          showChat={showChat}
+          selectedLead={selectedLead}
+          isConnected={isConnected}
+          onClose={() => {
+            setSelectedLead(null)
+            setShowChat(false)
+          }}
+          onOpenTags={() => {
+            if (selectedLead) {
+              setTagLead(selectedLead)
+              setShowTagModal(true)
+            }
+          }}
+          onOpenReminder={() => {
+            if (selectedLead) {
+              setReminderLead(selectedLead)
+              // Bug fix #4: Pre-populate with existing reminder data
+              setReminderDate(selectedLead.reminderDate || '')
+              setReminderNote(selectedLead.reminderNote || '')
+              setShowReminderModal(true)
+            }
+          }}
+          onTagsUpdate={(leadId, newTags) => {
+            // Update lead tags from AI analysis (respecting category uniqueness)
+            setLeads(prev => prev.map(l => {
+              if (l.id !== leadId) return l
+              // Merge new tags with existing, but replace same-category tags
+              const existingTags = l.tags || []
+              let mergedTags = [...existingTags]
+              
+              for (const newTag of newTags) {
+                const category = getTagCategory(newTag)
+                if (category) {
+                  // Remove existing tags from same category
+                  mergedTags = mergedTags.filter(t => getTagCategory(t) !== category)
+                }
+                if (!mergedTags.includes(newTag)) {
+                  mergedTags.push(newTag)
+                }
+              }
+              
+              return { ...l, tags: mergedTags }
+            }))
+          }}
+        />
+      )}
+
+      {/* Tag Modal */}
+      {showTagModal && tagLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in-0 duration-150" onClick={() => setShowTagModal(false)}>
+          <div className="bg-background rounded-lg p-4 w-80 shadow-xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-sm">Tags para {tagLead.name}</h3>
+              <button onClick={() => setShowTagModal(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            {/* Interesse - só 1 */}
+            <div className="mb-3">
+              <p className="text-xs text-muted-foreground mb-1.5">Nível de Interesse (selecione 1)</p>
+              <div className="flex gap-1.5">
+                {TAG_OPTIONS.filter(t => t.category === 'interesse').map(tag => {
+                  const isSelected = tagLead.tags?.includes(tag.label)
+                  return (
+                    <button
+                      key={tag.label}
+                      onClick={() => toggleTag(tagLead.id, tag.label)}
+                      className={`flex-1 px-2 py-1.5 rounded text-xs border transition flex items-center justify-center gap-1 ${
+                        isSelected ? tag.color + ' font-medium ring-2 ring-offset-1' : 'bg-muted/30 border-muted hover:bg-muted/50'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3" />}
+                      {tag.label.split(': ')[1]}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            
+            {/* Objeção - só 1 */}
+            <div className="mb-3">
+              <p className="text-xs text-muted-foreground mb-1.5">Objeção Principal (selecione 1)</p>
+              <div className="flex gap-1.5">
+                {TAG_OPTIONS.filter(t => t.category === 'objecao').map(tag => {
+                  const isSelected = tagLead.tags?.includes(tag.label)
+                  return (
+                    <button
+                      key={tag.label}
+                      onClick={() => toggleTag(tagLead.id, tag.label)}
+                      className={`flex-1 px-2 py-1.5 rounded text-xs border transition flex items-center justify-center gap-1 ${
+                        isSelected ? tag.color + ' font-medium ring-2 ring-offset-1' : 'bg-muted/30 border-muted hover:bg-muted/50'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3" />}
+                      {tag.label.split(': ')[1]}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            
+            {/* Outros */}
+            <div className="mb-3">
+              <p className="text-xs text-muted-foreground mb-1.5">Marcadores</p>
+              <div className="flex gap-1.5">
+                {TAG_OPTIONS.filter(t => t.category !== 'interesse' && t.category !== 'objecao').map(tag => {
+                  const isSelected = tagLead.tags?.includes(tag.label)
+                  return (
+                    <button
+                      key={tag.label}
+                      onClick={() => toggleTag(tagLead.id, tag.label)}
+                      className={`px-3 py-1.5 rounded text-xs border transition flex items-center gap-1 ${
+                        isSelected ? tag.color + ' font-medium ring-2 ring-offset-1' : 'bg-muted/30 border-muted hover:bg-muted/50'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3" />}
+                      {tag.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+            
+            {/* Tags atuais */}
+            {tagLead.tags && tagLead.tags.length > 0 && (
+              <div className="mb-3 pt-2 border-t">
+                <p className="text-xs text-muted-foreground mb-1.5">Tags atuais (clique para remover)</p>
+                <div className="flex flex-wrap gap-1">
+                  {tagLead.tags.map(tag => (
+                    <button
+                      key={tag}
+                      onClick={() => toggleTag(tagLead.id, tag)}
+                      className={`px-2 py-1 rounded text-xs border ${getTagColor(tag)} flex items-center gap-1`}
+                    >
+                      {tag.split(': ')[1] || tag}
+                      <X className="w-3 h-3" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            <Button 
+              className="w-full mt-3" 
+              variant="outline" 
+              size="sm"
+              onClick={() => setShowTagModal(false)}
+            >
+              Fechar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Reminder Modal */}
+      {showReminderModal && reminderLead && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in-0 duration-150" onClick={() => setShowReminderModal(false)}>
+          <div className="bg-background rounded-lg p-4 w-80 shadow-xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-sm">Lembrete para {reminderLead.name}</h3>
+              <button onClick={() => setShowReminderModal(false)} className="text-muted-foreground hover:text-foreground">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Data e hora</label>
+                <Input
+                  type="datetime-local"
+                  value={reminderDate}
+                  onChange={e => setReminderDate(e.target.value)}
+                  min={new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16)}
+                  className="text-sm"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-muted-foreground mb-1 block">Nota (opcional)</label>
+                <Input
+                  placeholder="Ex: Ligar sobre orçamento"
+                  value={reminderNote}
+                  onChange={e => setReminderNote(e.target.value)}
+                  className="text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="flex-1"
+                onClick={() => setShowReminderModal(false)}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                size="sm"
+                className="flex-1 bg-green-500 hover:bg-green-600"
+                onClick={() => {
+                  if (reminderDate) {
+                    addReminder(reminderLead.id, reminderDate, reminderNote)
+                  }
+                }}
+                disabled={!reminderDate}
+              >
+                Salvar
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reports Modal */}
+      {showReportsModal && (
+        <ReportsModal 
+          leads={leads}
+          onClose={() => setShowReportsModal(false)}
+        />
+      )}
+
+      {/* Bug fix #4: Modal de confirmação de delete */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in-0 duration-150" onClick={() => setShowDeleteConfirm(null)}>
+          <div className="bg-background rounded-lg p-4 w-80 shadow-xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-sm">Remover Lead</h3>
+                <p className="text-xs text-muted-foreground">Esta ação não pode ser desfeita</p>
+              </div>
+            </div>
+            <p className="text-sm mb-4">
+              Tem certeza que deseja remover <strong>{showDeleteConfirm.name}</strong>?
+            </p>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="flex-1"
+                onClick={() => setShowDeleteConfirm(null)}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                size="sm"
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                onClick={() => deleteLead(showDeleteConfirm.id)}
+              >
+                Remover
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
+  )
+}
+
+// Wrapper with Suspense for useSearchParams
+export default function Dashboard() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Carregando...</div>
+      </div>
+    }>
+      <DashboardContent />
+    </Suspense>
   )
 }
