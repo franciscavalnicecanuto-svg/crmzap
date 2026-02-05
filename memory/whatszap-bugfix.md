@@ -1,5 +1,35 @@
 # WhatsZap Bug Hunt Log
 
+## 2025-02-05 13:30 - Ciclo 5
+
+**Arquivos analisados:**
+- `src/app/reminders/page.tsx` (303 linhas)
+- `src/app/dashboard/page.tsx` (1908 linhas - completo)
+- `src/components/chat-panel.tsx` (550 linhas)
+
+**Status:** ✅ 3 bugs corrigidos e deployados
+
+**Bugs corrigidos:**
+
+### Bug #28: Memory leak no setTimeout de loading
+**Arquivo:** `dashboard/page.tsx` linha ~287
+**Problema:** O `setTimeout(() => setIsLoadingLeads(false), 300)` não tinha cleanup. Se o componente desmontasse antes de 300ms, causaria memory leak.
+**Solução:** Adicionado cleanup com `clearTimeout()` no return do useEffect.
+
+### Bug #29: selectedLead sync ineficiente
+**Arquivo:** `dashboard/page.tsx` linha ~236
+**Problema:** O useEffect que sincroniza `selectedLead` com `leads` atualizava sempre que `leads` mudava, mesmo sem mudanças reais nos dados do lead selecionado.
+**Solução:** Adicionada verificação de `hasChanges` comparando todos os campos relevantes (tags, reminderDate, status, value, etc.) antes de chamar `setSelectedLead`.
+
+### Bug #30: fetchError flickering
+**Arquivo:** `chat-panel.tsx` linha ~159
+**Problema:** Quando havia erro de fetch e o usuário clicava "Tentar novamente", o erro permanecia visível por um frame antes de limpar durante o novo fetch.
+**Solução:** Limpeza do `fetchError` imediatamente ao iniciar um novo fetch com `showLoading=true`.
+
+**Deploy:** ✅ https://whatszap-zeta.vercel.app
+
+---
+
 ## 2025-02-05 10:42 - Ciclo 4
 
 **Arquivos analisados:**
