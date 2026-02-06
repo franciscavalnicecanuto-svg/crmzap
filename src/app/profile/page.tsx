@@ -163,11 +163,35 @@ export default function ProfilePage() {
                 <Input 
                   id="phone"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => {
+                    // UX #705: Auto-format phone number as user types
+                    let value = e.target.value.replace(/\D/g, '') // Remove non-digits
+                    if (value.length > 11) value = value.slice(0, 11) // Max 11 digits
+                    
+                    // Format: (XX) XXXXX-XXXX or (XX) XXXX-XXXX
+                    if (value.length > 0) {
+                      if (value.length <= 2) {
+                        value = `(${value}`
+                      } else if (value.length <= 7) {
+                        value = `(${value.slice(0, 2)}) ${value.slice(2)}`
+                      } else {
+                        const hasNinthDigit = value.length > 10
+                        value = `(${value.slice(0, 2)}) ${value.slice(2, hasNinthDigit ? 7 : 6)}-${value.slice(hasNinthDigit ? 7 : 6)}`
+                      }
+                    }
+                    setPhone(value)
+                  }}
                   className="pl-10"
                   placeholder="(00) 00000-0000"
+                  maxLength={16}
                 />
               </div>
+              {/* UX #705: Show hint about format */}
+              {phone && phone.replace(/\D/g, '').length > 0 && phone.replace(/\D/g, '').length < 10 && (
+                <p className="text-xs text-amber-600">
+                  Digite o número completo com DDD
+                </p>
+              )}
             </div>
 
             <div className="flex justify-end gap-3 pt-4">

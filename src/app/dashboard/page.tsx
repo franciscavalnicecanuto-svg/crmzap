@@ -2189,6 +2189,7 @@ function DashboardContent() {
                     onDrop={(e) => handleDrop(e, status)}
                   >
                     {/* UX #72: Enhanced column header with drag highlight */}
+                    {/* UX #700: Show total value of leads in column */}
                     <div className={`rounded-md border p-1.5 mb-1 transition-all ${
                       dragOverColumn === status 
                         ? 'ring-2 ring-green-400 shadow-lg border-green-300 bg-green-50' 
@@ -2200,6 +2201,21 @@ function DashboardContent() {
                           {statusLeads.length}
                         </Badge>
                       </div>
+                      {/* UX #700: Total value of leads in this column */}
+                      {(() => {
+                        const totalValue = statusLeads.reduce((sum, lead) => sum + (lead.value || 0), 0)
+                        if (totalValue > 0) {
+                          return (
+                            <div className="mt-0.5 flex items-center gap-1">
+                              <DollarSign className="w-2.5 h-2.5 text-green-600" />
+                              <span className="text-[9px] font-medium text-green-700">
+                                {totalValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 0 })}
+                              </span>
+                            </div>
+                          )
+                        }
+                        return null
+                      })()}
                     </div>
                     
                     <div className="flex-1 overflow-y-auto">
@@ -2926,8 +2942,23 @@ function DashboardContent() {
       )}
 
       {/* Reminder Modal */}
+      {/* UX #701: Press Enter to confirm reminder when date is filled */}
       {showReminderModal && reminderLead && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in-0 duration-150" onClick={() => setShowReminderModal(false)}>
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in-0 duration-150" 
+          onClick={() => setShowReminderModal(false)}
+          onKeyDown={(e) => {
+            // UX #701: Enter confirms if date is set (and not in textarea that might need Enter)
+            if (e.key === 'Enter' && !e.shiftKey && reminderDate && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+              e.preventDefault()
+              addReminder(reminderLead.id, reminderDate, reminderNote)
+            }
+            // Escape closes modal
+            if (e.key === 'Escape') {
+              setShowReminderModal(false)
+            }
+          }}
+        >
           <div className="bg-background rounded-lg p-4 w-80 shadow-xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-200" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-sm">Lembrete para {reminderLead.name}</h3>
@@ -3087,6 +3118,12 @@ function DashboardContent() {
                 Salvar
               </Button>
             </div>
+            {/* UX #701: Hint that Enter confirms */}
+            {reminderDate && (
+              <p className="text-[10px] text-center text-muted-foreground mt-2">
+                Pressione <kbd className="px-1 py-0.5 bg-muted rounded text-[9px] font-mono">Enter</kbd> para confirmar
+              </p>
+            )}
           </div>
         </div>
       )}
