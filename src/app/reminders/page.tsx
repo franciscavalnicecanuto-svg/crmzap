@@ -85,6 +85,13 @@ export default function RemindersPage() {
   // UX #181: Keyboard shortcuts for reminders page
   // Note: filteredLeads computed later, so we access it via ref pattern
   const filteredLeadsRef = useRef<Lead[]>([])
+  // Bug fix #286: Refs to prevent stale closure in keyboard handler
+  const leadsRef = useRef(leads)
+  const completedRemindersRef = useRef(completedReminders)
+  
+  // Keep refs in sync with state
+  useEffect(() => { leadsRef.current = leads }, [leads])
+  useEffect(() => { completedRemindersRef.current = completedReminders }, [completedReminders])
   
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -129,12 +136,38 @@ export default function RemindersPage() {
         }
       }
       
-      // 'd' to mark as done
+      // 'd' to mark as done - Bug fix #286: Use refs to access current state
       if (e.key === 'd' && currentFiltered.length > 0) {
         e.preventDefault()
         const selectedLead = currentFiltered[selectedIndex]
         if (selectedLead) {
-          markAsDone(selectedLead.id)
+          // Bug fix #286: Access current state via refs to avoid stale closure
+          const currentLeads = leadsRef.current
+          const lead = currentLeads.find(l => l.id === selectedLead.id)
+          if (lead) {
+            // Inline markAsDone logic using refs for fresh state
+            setCompletingId(selectedLead.id)
+            
+            const newCompleted: CompletedReminder = {
+              leadId: lead.id,
+              leadName: lead.name,
+              phone: lead.phone,
+              reminderDate: lead.reminderDate,
+              reminderNote: lead.reminderNote,
+              completedAt: new Date().toISOString()
+            }
+            const currentHistory = completedRemindersRef.current
+            const updatedHistory = [newCompleted, ...currentHistory].slice(0, 50)
+            setCompletedReminders(updatedHistory)
+            localStorage.setItem('whatszap-completed-reminders', JSON.stringify(updatedHistory))
+            
+            if ('vibrate' in navigator) navigator.vibrate([10, 30, 10])
+            
+            setTimeout(() => {
+              clearReminder(selectedLead.id)
+              setCompletingId(null)
+            }, 400)
+          }
         }
       }
     }
