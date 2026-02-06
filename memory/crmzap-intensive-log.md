@@ -1,5 +1,75 @@
 # CRMZap - Log de Melhoria Intensiva
 
+## 2026-02-06 00:40 - Sessão Intensiva #3
+
+### 🎯 Resumo
+Melhorias focadas em UX de lembretes, feedback de chat e correções de bugs.
+
+---
+
+## ✅ Melhorias Implementadas (Sessão #3)
+
+### 1. Profile Page (profile/page.tsx)
+**UX Improvements:**
+- **#79**: Modal de confirmação customizado para exclusão de conta (substituiu `confirm()` nativo)
+- Loading indicator durante deleção de conta
+- Animações de entrada/saída no modal
+
+### 2. Reminders Page (reminders/page.tsx)
+**UX Improvements:**
+- **#82**: Mais opções de snooze para lembretes atrasados:
+  - +1h, +3h (já existiam)
+  - +Amanhã (9h da manhã seguinte)
+  - +Seg (segunda-feira 9h)
+- Haptic feedback nos botões de snooze
+
+### 3. Dashboard (dashboard/page.tsx)
+**UX Improvements:**
+- **#85**: Indicador visual de urgência nos lembretes:
+  - Atrasado: ícone vermelho pulsante + tooltip vermelho
+  - Urgente (<2h): ícone laranja com bounce
+  - Próximo (<24h): ícone âmbar
+  - Normal: ícone âmbar claro
+- Contador regressivo no tooltip ("em 30min", "2h atrás")
+
+### 4. Chat Panel (chat-panel.tsx)
+**UX Improvements:**
+- **#84**: Indicador "Enviando mensagem..." visível acima do input
+- Textarea muda cor de fundo durante envio
+- Botão de enviar com estado visual diferenciado
+
+### 5. Reports Page (reports/page.tsx)
+**Bug Fixes:**
+- **#81**: Safe date parsing com `parseSafeDate()` para tratar `createdAt` undefined
+- Previne NaN em cálculos de comparação mensal
+
+### 6. Settings Page (settings/page.tsx)
+**Bug Fixes:**
+- **#83**: Validação de input para meta mensal:
+  - Não permite valores negativos
+  - Não permite NaN
+  - Auto-corrige para 10000 ao perder foco com valor inválido
+  - Atributos `min="0"` e `step="100"` no input
+
+---
+
+## 📊 Commits
+
+1. `feat(ux): improve reminders, chat feedback, and fix date handling`
+   - 6 arquivos alterados (dashboard, profile, reminders, reports, settings, chat-panel)
+   - UX #79, #82, #84, #85
+   - Bug fixes #81, #83
+
+---
+
+## 🚀 Deploy
+
+**URL:** https://whatszap-zeta.vercel.app
+**Status:** ✅ Deployed
+**Timestamp:** 2026-02-06 00:40
+
+---
+
 ## 2025-02-06 00:32 - Sessão Intensiva #2
 
 ### 🎯 Resumo
@@ -133,4 +203,4 @@ Sessão de 10 horas focada em UX, bugs e features.
 
 ---
 
-*Atualizado: 2025-02-06 00:30*
+*Atualizado: 2026-02-06 00:40*
