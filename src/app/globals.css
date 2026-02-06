@@ -486,3 +486,311 @@ html {
     transition: transform 0.1s ease, background-color 0.1s ease;
   }
 }
+
+/* UX #186: Pulsating scroll button when new messages arrive */
+@keyframes scroll-button-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.5);
+  }
+}
+
+.scroll-button-pulse {
+  animation: scroll-button-pulse 1.2s ease-in-out infinite;
+}
+
+/* UX #187: Message sent flash effect */
+@keyframes message-sent-flash {
+  0% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 10px rgba(34, 197, 94, 0);
+  }
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0);
+  }
+}
+
+.message-sent-flash {
+  animation: message-sent-flash 0.5s ease-out;
+}
+
+/* UX #188: Reminder completion celebration */
+@keyframes reminder-complete {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  30% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(0.95) translateX(50px);
+    opacity: 0;
+  }
+}
+
+.reminder-completing {
+  animation: reminder-complete 0.4s ease-out forwards;
+}
+
+/* UX #189: Sync progress shimmer */
+@keyframes sync-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.sync-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(34, 197, 94, 0.1) 0%,
+    rgba(34, 197, 94, 0.3) 50%,
+    rgba(34, 197, 94, 0.1) 100%
+  );
+  background-size: 200% 100%;
+  animation: sync-shimmer 1.5s ease-in-out infinite;
+}
+
+/* UX #190: Counter animation */
+@keyframes count-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.count-animated {
+  animation: count-up 0.3s ease-out;
+}
+
+/* UX #191: Empty state glow effect */
+@keyframes empty-state-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(34, 197, 94, 0.2);
+  }
+}
+
+.empty-state-glow {
+  animation: empty-state-glow 3s ease-in-out infinite;
+}
+
+/* UX #192: Connection status indicator */
+@keyframes connection-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.connection-reconnecting {
+  animation: connection-pulse 1s ease-in-out infinite;
+}
+
+/* UX #200: Message copy feedback */
+@keyframes copy-success {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.copy-success {
+  animation: copy-success 0.3s ease-out;
+}
+
+/* UX #201: Context menu appearance */
+@keyframes context-menu-appear {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 4px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+.context-menu-animate {
+  animation: context-menu-appear 0.15s ease-out;
+}
+
+/* UX #203: Improved group hover for messages */
+.group\/message:hover .copy-button-hidden {
+  opacity: 1;
+}
+
+/* UX #204: Better focus states for interactive elements */
+button:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid oklch(0.55 0.18 145);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* UX #205: Mobile-friendly long press indicator */
+@keyframes long-press-indicator {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.05);
+    opacity: 0.8;
+  }
+}
+
+.long-pressing {
+  animation: long-press-indicator 0.5s ease-out;
+}
+
+/* UX #206: Urgent reminder pulse animation */
+@keyframes urgent-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(251, 146, 60, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(251, 146, 60, 0);
+  }
+}
+
+.urgent-reminder-pulse {
+  animation: urgent-pulse 2s ease-in-out infinite;
+}
+
+/* UX #207: Snooze button hover effect */
+.snooze-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(251, 146, 60, 0.2);
+}
+
+/* UX #210: Focus animation for textarea */
+textarea:focus {
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.1);
+}
+
+/* UX #211: Active user indicator animation */
+@keyframes active-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.user-active-indicator {
+  animation: active-pulse 2s ease-in-out infinite;
+}
+
+/* UX #212: Copy feedback animation */
+@keyframes copy-flash {
+  0% {
+    background-color: rgba(34, 197, 94, 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.copy-flash {
+  animation: copy-flash 0.3s ease-out;
+}
+
+/* UX #213: Enhanced sending indicator */
+@keyframes sending-border-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sending-spinner {
+  animation: sending-border-spin 1s linear infinite;
+}
+
+/* UX #214: Improved message bubble hover */
+.message-bubble:hover {
+  filter: brightness(0.97);
+}
+
+/* UX #215: Better scroll indicator */
+@keyframes bounce-gentle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.scroll-indicator-bounce {
+  animation: bounce-gentle 1.5s ease-in-out infinite;
+}
+
+/* UX #216: Smooth card selection transition */
+.lead-card-selected {
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+/* UX #217: Quick action buttons fade in */
+@keyframes quick-actions-appear {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.quick-actions-animate {
+  animation: quick-actions-appear 0.15s ease-out;
+}
+
+/* UX #218: Better disabled state for buttons */
+button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.3);
+}
+
+/* UX #219: Improved tooltip styling */
+[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  background: oklch(0.2 0.02 240);
+  color: white;
+  font-size: 10px;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 100;
+  pointer-events: none;
+}
