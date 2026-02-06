@@ -176,6 +176,66 @@ export default function RemindersPage() {
           }
         }
       }
+      
+      // UX #700: Keyboard snooze shortcuts (1=30m, 2=1h, 3=3h, 4=tomorrow, 5=monday)
+      const snoozeMap: Record<string, { ms: number | 'tomorrow' | 'monday', label: string }> = {
+        '1': { ms: 30 * 60 * 1000, label: '30 minutos' },
+        '2': { ms: 60 * 60 * 1000, label: '1 hora' },
+        '3': { ms: 3 * 60 * 60 * 1000, label: '3 horas' },
+        '4': { ms: 'tomorrow', label: 'amanhã às 9h' },
+        '5': { ms: 'monday', label: 'segunda às 9h' },
+      }
+      
+      if (snoozeMap[e.key] && currentFiltered.length > 0) {
+        e.preventDefault()
+        const selectedLead = currentFiltered[selectedIndex]
+        if (selectedLead) {
+          const currentLeads = leadsRef.current
+          const lead = currentLeads.find(l => l.id === selectedLead.id)
+          if (lead?.reminderDate) {
+            const option = snoozeMap[e.key]
+            let targetDate: Date
+            
+            if (option.ms === 'tomorrow') {
+              targetDate = new Date()
+              targetDate.setDate(targetDate.getDate() + 1)
+              targetDate.setHours(9, 0, 0, 0)
+            } else if (option.ms === 'monday') {
+              const today = new Date()
+              const daysUntilMonday = today.getDay() === 1 ? 7 : (8 - today.getDay()) % 7 || 7
+              targetDate = new Date(today)
+              targetDate.setDate(today.getDate() + daysUntilMonday)
+              targetDate.setHours(9, 0, 0, 0)
+            } else {
+              targetDate = new Date(Date.now() + option.ms)
+            }
+            
+            // Format as local ISO string
+            const year = targetDate.getFullYear()
+            const month = String(targetDate.getMonth() + 1).padStart(2, '0')
+            const day = String(targetDate.getDate()).padStart(2, '0')
+            const hours = String(targetDate.getHours()).padStart(2, '0')
+            const minutes = String(targetDate.getMinutes()).padStart(2, '0')
+            const newDate = `${year}-${month}-${day}T${hours}:${minutes}`
+            
+            const updated = currentLeads.map(l => 
+              l.id === lead.id ? { ...l, reminderDate: newDate } : l
+            )
+            setLeads(updated)
+            localStorage.setItem('whatszap-leads-v3', JSON.stringify(updated))
+            
+            // Visual + haptic feedback
+            if ('vibrate' in navigator) navigator.vibrate([10, 20, 10])
+            
+            // Show brief toast-like feedback via temporary CSS class
+            const card = document.querySelector(`[data-reminder-id="${lead.id}"]`)
+            if (card) {
+              card.classList.add('snooze-success')
+              setTimeout(() => card.classList.remove('snooze-success'), 600)
+            }
+          }
+        }
+      }
     }
     
     window.addEventListener('keydown', handleKeyDown)
@@ -631,9 +691,9 @@ export default function RemindersPage() {
           </div>
         </div>
         
-        {/* UX #181: Keyboard shortcuts hint */}
+        {/* UX #181: Keyboard shortcuts hint - UX #700: Added snooze shortcuts */}
         {filteredLeads.length > 0 && (
-          <div className="text-[10px] text-muted-foreground mb-3 flex items-center gap-3">
+          <div className="text-[10px] text-muted-foreground mb-3 flex flex-wrap items-center gap-x-3 gap-y-1">
             <span className="flex items-center gap-1">
               <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">↑↓</kbd> navegar
             </span>
@@ -641,7 +701,10 @@ export default function RemindersPage() {
               <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">Enter</kbd> abrir
             </span>
             <span className="flex items-center gap-1">
-              <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">D</kbd> marcar feito
+              <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">D</kbd> feito
+            </span>
+            <span className="hidden sm:flex items-center gap-1 text-blue-600">
+              <kbd className="px-1 py-0.5 bg-blue-50 rounded text-[9px] border border-blue-200">1-5</kbd> adiar
             </span>
           </div>
         )}
@@ -796,6 +859,7 @@ export default function RemindersPage() {
               return (
                 <Card 
                   key={lead.id}
+                  data-reminder-id={lead.id}
                   className={`p-4 transition-all hover:shadow-md cursor-pointer ${
                     completingId === lead.id 
                       ? 'reminder-completing' 
