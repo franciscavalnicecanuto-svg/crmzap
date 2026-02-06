@@ -46,30 +46,35 @@ export function ConnectionStatus({ state, className = '', onRetry }: ConnectionS
     return null
   }
 
+  // UX #178: Enhanced status messages with more context
   const config = {
     connected: {
       bg: 'bg-green-500',
       icon: <CheckCircle2 className="w-3 h-3" />,
-      text: 'Conectado ✓'
+      text: 'Conectado ✓',
+      subtext: null
     },
     connecting: {
-      bg: 'bg-amber-500',
+      bg: 'bg-amber-500 animate-pulse',
       icon: <Loader2 className="w-3 h-3 animate-spin" />,
-      text: 'Reconectando...'
+      text: 'Reconectando...',
+      subtext: 'Aguarde'
     },
     disconnected: {
       bg: 'bg-red-500',
       icon: <WifiOff className="w-3 h-3" />,
-      text: 'Sem conexão'
+      text: 'WhatsApp desconectado',
+      subtext: 'Mensagens não serão enviadas'
     }
   }
 
-  const { bg, icon, text } = config[state]
+  const { bg, icon, text, subtext } = config[state]
 
   return (
     <div className={`${bg} text-white text-xs py-1.5 px-3 flex items-center justify-center gap-2 animate-in slide-in-from-top-2 duration-200 ${className}`}>
       {icon}
       <span className="font-medium">{text}</span>
+      {subtext && <span className="opacity-70 hidden sm:inline">· {subtext}</span>}
       {state === 'disconnected' && (
         <>
           {onRetry && (
@@ -77,21 +82,24 @@ export function ConnectionStatus({ state, className = '', onRetry }: ConnectionS
               onClick={() => {
                 setRetryCount(prev => prev + 1)
                 onRetry()
+                // Haptic feedback
+                if ('vibrate' in navigator) navigator.vibrate(10)
               }}
-              className="ml-1 p-0.5 hover:bg-white/20 rounded transition-colors flex items-center gap-1"
+              className="ml-1 p-1 hover:bg-white/20 rounded transition-colors flex items-center gap-1 min-h-[28px] touch-manipulation"
               title="Tentar reconectar"
+              aria-label="Tentar reconectar"
             >
-              <RefreshCw className="w-3 h-3" />
+              <RefreshCw className={`w-3 h-3 ${retryCount > 0 ? 'animate-spin' : ''}`} />
               {retryCount > 0 && <span className="text-[10px] opacity-70">({retryCount})</span>}
             </button>
           )}
-          {/* UX #96: Link to reconnect page after multiple retries */}
-          {retryCount >= 2 && (
+          {/* UX #178: Show reconnect link immediately on mobile, or after 1 retry on desktop */}
+          {(retryCount >= 1 || window.innerWidth < 640) && (
             <Link 
               href="/connect" 
-              className="ml-1 px-1.5 py-0.5 bg-white/20 hover:bg-white/30 rounded text-[10px] font-medium transition-colors"
+              className="ml-1 px-2 py-1 bg-white/20 hover:bg-white/30 rounded text-[10px] font-semibold transition-colors min-h-[28px] flex items-center touch-manipulation"
             >
-              Reconectar
+              Reconectar →
             </Link>
           )}
         </>

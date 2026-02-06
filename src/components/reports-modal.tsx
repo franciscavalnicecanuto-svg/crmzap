@@ -627,26 +627,30 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b px-2 sm:px-4 bg-muted/30">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-3 text-sm font-medium border-b-2 transition flex-1 sm:flex-none ${
-                activeTab === tab.id 
-                  ? 'border-blue-500 text-blue-600' 
-                  : 'border-transparent text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <tab.icon className="w-4 h-4" />
-              <span className="hidden sm:inline">{tab.label}</span>
-            </button>
-          ))}
+        {/* Tabs - UX #175: Improved mobile scrolling and touch targets */}
+        <div className="border-b bg-muted/30 overflow-x-auto scrollbar-hide">
+          <div className="flex px-2 sm:px-4 min-w-max">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className={`flex items-center justify-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition whitespace-nowrap min-h-[48px] touch-manipulation active:bg-muted/50 ${
+                  activeTab === tab.id 
+                    ? 'border-blue-500 text-blue-600 bg-blue-50/50' 
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30'
+                }`}
+                aria-selected={activeTab === tab.id}
+                role="tab"
+              >
+                <tab.icon className="w-4 h-4 flex-shrink-0" />
+                <span>{tab.label}</span>
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
+        {/* Content - UX #175: Better mobile padding and scroll behavior */}
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 overscroll-contain">
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <div className="space-y-6">

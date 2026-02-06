@@ -50,6 +50,7 @@ export function QuickActionsMenu({
   className = ''
 }: QuickActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false) // Bug fix #176: Prevent double-click
   const menuRef = useRef<HTMLDivElement>(null)
 
   // Close on click outside
@@ -75,11 +76,19 @@ export function QuickActionsMenu({
     return () => document.removeEventListener('keydown', handleEscape)
   }, [])
 
+  // Bug fix #176: Prevent double-click with debounce
   const handleAction = (actionId: string) => {
+    if (isProcessing) return // Prevent double-click
+    
+    setIsProcessing(true)
     onAction(actionId)
     setIsOpen(false)
+    
     // Haptic feedback
     if ('vibrate' in navigator) navigator.vibrate(10)
+    
+    // Reset processing state after brief delay
+    setTimeout(() => setIsProcessing(false), 300)
   }
 
   // Filter actions based on state

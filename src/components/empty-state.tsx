@@ -1,6 +1,6 @@
 'use client'
 
-import { MessageCircle, Users, Inbox, Search, Wifi, Download, ArrowRight, Sparkles, Zap, RefreshCw } from 'lucide-react'
+import { MessageCircle, Users, Inbox, Search, Wifi, Download, ArrowRight, Sparkles, Zap, RefreshCw, Clock, Bell, Tag } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface EmptyStateProps {
@@ -31,8 +31,9 @@ export function EmptyState({ type, onAction, actionLabel, secondaryAction, secon
       description: 'Clique em um lead à esquerda para ver as mensagens.',
       gradient: 'from-blue-500/20 to-cyan-500/20',
       tips: [
-        '💡 Use Ctrl+K para buscar leads',
-        '⌨️ Enter para enviar mensagens',
+        '💡 Use <kbd>Ctrl</kbd>+<kbd>K</kbd> para buscar leads',
+        '⬆️⬇️ <kbd>↑</kbd><kbd>↓</kbd> ou <kbd>J</kbd><kbd>K</kbd> para navegar',
+        '🏷️ <kbd>T</kbd> para tags, <kbd>R</kbd> para lembrete',
         '✨ IA sugere respostas automaticamente'
       ]
     },
@@ -106,7 +107,7 @@ export function EmptyState({ type, onAction, actionLabel, secondaryAction, secon
         {config.description}
       </p>
       
-      {/* Tips section */}
+      {/* Tips section - UX #177: Enhanced with keyboard shortcut styling */}
       {config.tips && (
         <div className="mb-5 text-left bg-muted/30 rounded-lg p-3 max-w-[280px]">
           <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
@@ -115,9 +116,16 @@ export function EmptyState({ type, onAction, actionLabel, secondaryAction, secon
           </div>
           <ul className="space-y-1.5">
             {config.tips.map((tip, idx) => (
-              <li key={idx} className="text-xs text-muted-foreground/80 leading-relaxed">
-                {tip}
-              </li>
+              <li 
+                key={idx} 
+                className="text-xs text-muted-foreground/80 leading-relaxed"
+                dangerouslySetInnerHTML={{
+                  __html: tip.replace(
+                    /<kbd>([^<]+)<\/kbd>/g, 
+                    '<kbd class="px-1 py-0.5 bg-muted rounded text-[10px] font-mono border border-border/50 shadow-sm">$1</kbd>'
+                  )
+                }}
+              />
             ))}
           </ul>
         </div>
