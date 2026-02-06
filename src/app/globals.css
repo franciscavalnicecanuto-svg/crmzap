@@ -794,3 +794,154 @@ button:disabled {
   z-index: 100;
   pointer-events: none;
 }
+
+/* UX #245: Enhanced empty column state */
+@keyframes empty-column-breathe {
+  0%, 100% {
+    border-color: oklch(0.85 0.01 240);
+    background-color: oklch(0.98 0.005 240);
+  }
+  50% {
+    border-color: oklch(0.55 0.18 145 / 0.3);
+    background-color: oklch(0.55 0.18 145 / 0.05);
+  }
+}
+
+.empty-column-animate {
+  animation: empty-column-breathe 3s ease-in-out infinite;
+}
+
+/* UX #246: Lead moved celebration */
+@keyframes lead-moved {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.5);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 8px rgba(34, 197, 94, 0);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: none;
+  }
+}
+
+.lead-just-moved {
+  animation: lead-moved 0.4s ease-out;
+}
+
+/* UX #247: Improved sync completion */
+@keyframes sync-complete-flash {
+  0% {
+    background-color: oklch(0.55 0.18 145 / 0.2);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.sync-complete {
+  animation: sync-complete-flash 0.5s ease-out;
+}
+
+/* UX #248: Better drag preview */
+.drag-preview {
+  transform: rotate(3deg) scale(1.05);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+  opacity: 0.9;
+}
+
+/* UX #249: Column highlight on drag enter */
+@keyframes column-highlight {
+  0% {
+    border-color: oklch(0.55 0.18 145 / 0.3);
+  }
+  50% {
+    border-color: oklch(0.55 0.18 145 / 0.7);
+  }
+  100% {
+    border-color: oklch(0.55 0.18 145 / 0.3);
+  }
+}
+
+.column-drag-target {
+  animation: column-highlight 1s ease-in-out infinite;
+  background: linear-gradient(180deg, oklch(0.55 0.18 145 / 0.1) 0%, transparent 100%);
+}
+
+/* UX #250: Improved filter badge animation */
+@keyframes filter-count-update {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.2);
+    background-color: oklch(0.55 0.18 145);
+    color: white;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.filter-count-updated {
+  animation: filter-count-update 0.3s ease-out;
+}
+
+/* UX #251: Reminder today column glow */
+@keyframes reminder-column-glow {
+  0%, 100% {
+    box-shadow: 0 0 10px oklch(0.75 0.15 60 / 0.2);
+  }
+  50% {
+    box-shadow: 0 0 20px oklch(0.75 0.15 60 / 0.4);
+  }
+}
+
+.reminder-column-active {
+  animation: reminder-column-glow 3s ease-in-out infinite;
+}
+
+/* UX #252: Improved mobile scroll snap */
+@media (max-width: 768px) {
+  .kanban-container {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .kanban-column-snap {
+    scroll-snap-align: start;
+    scroll-margin-left: 8px;
+  }
+}
+
+/* UX #253: Better loading state for messages */
+@keyframes message-loading-pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.message-loading {
+  animation: message-loading-pulse 1.5s ease-in-out infinite;
+}
+
+/* UX #254: Improved accessibility focus ring */
+.focus-ring-green:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px oklch(0.55 0.18 145 / 0.4);
+  border-color: oklch(0.55 0.18 145);
+}
+
+/* UX #255: Search result highlight */
+.search-highlight {
+  background-color: oklch(0.85 0.15 90);
+  padding: 0 2px;
+  border-radius: 2px;
+}

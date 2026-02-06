@@ -891,6 +891,9 @@ function DashboardContent() {
     }
   }
 
+  // Track recently moved leads for animation
+  const [recentlyMovedLead, setRecentlyMovedLead] = useState<string | null>(null)
+  
   const moveLead = (id: string, newStatus: LeadStatus) => {
     const lead = leads.find(l => l.id === id)
     const oldStatus = lead?.status
@@ -918,12 +921,23 @@ function DashboardContent() {
         details: { from: oldStatus, to: newStatus }
       })
       
-      // UX #101: Show visual feedback on move
-      const statusLabel = kanbanColumns.find(c => c.id === newStatus)?.label || newStatus
-      showToast(`${lead.name.split(' ')[0]} → ${statusLabel}`, 'success')
+      // UX #246: Animate the moved card
+      setRecentlyMovedLead(id)
+      setTimeout(() => setRecentlyMovedLead(null), 500)
       
-      // Haptic feedback on mobile
-      if ('vibrate' in navigator) navigator.vibrate([10, 30, 10])
+      // UX #101: Show visual feedback on move with status color
+      const statusLabel = kanbanColumns.find(c => c.id === newStatus)?.label || newStatus
+      const isWin = newStatus === 'fechado'
+      const isLoss = newStatus === 'perdido'
+      showToast(
+        `${isWin ? '🎉 ' : isLoss ? '😔 ' : ''}${lead.name.split(' ')[0]} → ${statusLabel}`, 
+        isWin ? 'success' : isLoss ? 'info' : 'success'
+      )
+      
+      // Haptic feedback on mobile - stronger for wins
+      if ('vibrate' in navigator) {
+        navigator.vibrate(isWin ? [20, 50, 20, 50, 20] : [10, 30, 10])
+      }
     }
   }
 
@@ -1560,22 +1574,42 @@ function DashboardContent() {
 
         {/* UX #189: Enhanced Sync Progress Bar with shimmer */}
         {isSyncing && (
-          <div className="bg-green-50 border-b border-green-200 px-3 py-2 animate-in slide-in-from-top-1 duration-200 sync-shimmer">
+          <div className={`border-b px-3 py-2 animate-in slide-in-from-top-1 duration-200 transition-colors ${
+            syncProgress >= 100 
+              ? 'bg-green-100 border-green-300 sync-complete' 
+              : 'bg-green-50 border-green-200 sync-shimmer'
+          }`}>
             <div className="flex items-center gap-2 text-xs text-green-700 mb-1">
-              <Loader2 className="w-3 h-3 animate-spin" />
+              {syncProgress >= 100 ? (
+                <Check className="w-3 h-3 text-green-600" />
+              ) : (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              )}
               <span className="font-medium">
-                {syncProgress < 30 ? 'Conectando...' : 
-                 syncProgress < 70 ? 'Sincronizando mensagens...' :
-                 syncProgress < 95 ? 'Quase lá...' : 'Finalizando!'}
+                {syncProgress < 20 ? '📡 Conectando ao servidor...' : 
+                 syncProgress < 50 ? '📥 Buscando mensagens...' :
+                 syncProgress < 80 ? '💾 Salvando mensagens...' :
+                 syncProgress < 95 ? '🔄 Processando...' : 
+                 syncProgress >= 100 ? '✅ Sincronização completa!' : '⏳ Finalizando...'}
               </span>
-              <span className="ml-auto font-bold count-animated">{Math.round(syncProgress)}%</span>
+              <span className={`ml-auto font-bold count-animated transition-colors ${
+                syncProgress >= 100 ? 'text-green-600' : ''
+              }`}>
+                {Math.round(syncProgress)}%
+              </span>
             </div>
             <div className="w-full h-2 bg-green-200/60 rounded-full overflow-hidden backdrop-blur-sm">
               <div 
-                className="h-full bg-gradient-to-r from-green-500 via-green-400 to-green-500 rounded-full transition-all duration-300 ease-out relative"
-                style={{ width: `${syncProgress}%` }}
+                className={`h-full rounded-full transition-all ease-out relative ${
+                  syncProgress >= 100 
+                    ? 'bg-green-500 duration-500' 
+                    : 'bg-gradient-to-r from-green-500 via-green-400 to-green-500 duration-300'
+                }`}
+                style={{ width: `${Math.min(syncProgress, 100)}%` }}
               >
-                <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                {syncProgress < 100 && (
+                  <div className="absolute inset-0 bg-white/20 animate-pulse" />
+                )}
               </div>
             </div>
           </div>
@@ -1928,7 +1962,7 @@ function DashboardContent() {
                                   : hasUnread 
                                     ? 'bg-green-50 border-green-300 shadow-sm' 
                                     : ''
-                              } ${draggedLead === lead.id ? 'dragging-card' : ''}`}
+                              } ${draggedLead === lead.id ? 'dragging-card' : ''} ${recentlyMovedLead === lead.id ? 'lead-just-moved' : ''}`}
                               draggable
                               role="button"
                               tabIndex={0}
@@ -2150,8 +2184,28 @@ function DashboardContent() {
                         })}
                         
                         {statusLeads.length === 0 && (
-                          <div className="text-center py-4 text-muted-foreground text-[9px] border border-dashed rounded-md">
-                            Arraste aqui
+                          <div className={`text-center py-6 text-muted-foreground text-[9px] border-2 border-dashed rounded-lg transition-all ${
+                            draggedLead 
+                              ? 'border-green-400 bg-green-50/50 empty-column-animate' 
+                              : 'border-muted'
+                          }`}>
+                            <div className={`w-8 h-8 mx-auto mb-2 rounded-full flex items-center justify-center transition-all ${
+                              draggedLead ? 'bg-green-100' : 'bg-muted/30'
+                            }`}>
+                              {draggedLead ? (
+                                <Plus className="w-4 h-4 text-green-600" />
+                              ) : (
+                                <MessageCircle className="w-4 h-4 text-muted-foreground/50" />
+                              )}
+                            </div>
+                            <p className="font-medium">
+                              {draggedLead ? 'Solte aqui' : 'Nenhum lead'}
+                            </p>
+                            {!draggedLead && (
+                              <p className="text-[8px] mt-0.5 opacity-70">
+                                Arraste leads para cá
+                              </p>
+                            )}
                           </div>
                         )}
                       </div>
@@ -2161,21 +2215,47 @@ function DashboardContent() {
               })}
               
               {/* Lembretes Hoje - Column (Bug fix #19: separate passed vs pending) */}
-              <div className="flex-shrink-0 w-44 flex flex-col">
-                <div className="rounded-md border bg-amber-50 border-amber-200 p-1.5 mb-1">
-                  <div className="flex items-center gap-1">
-                    <Bell className="w-3 h-3 text-amber-600" />
-                    <span className="font-semibold text-xs text-amber-700">Lembretes Hoje</span>
-                    <Badge variant="secondary" className="text-[10px] h-4 px-1 bg-amber-100 text-amber-700">
-                      {leads.filter(l => {
-                        if (!l.reminderDate) return false
-                        const reminderDate = new Date(l.reminderDate)
-                        const today = new Date()
-                        return reminderDate.toDateString() === today.toDateString()
-                      }).length}
-                    </Badge>
-                  </div>
-                </div>
+              <div className="flex-shrink-0 w-44 flex flex-col snap-start">
+                {(() => {
+                  const now = new Date()
+                  const todayRemindersCount = leads.filter(l => {
+                    if (!l.reminderDate) return false
+                    const reminderDate = new Date(l.reminderDate)
+                    return reminderDate.toDateString() === now.toDateString()
+                  }).length
+                  const overdueCount = leads.filter(l => {
+                    if (!l.reminderDate) return false
+                    return new Date(l.reminderDate) < now && new Date(l.reminderDate).toDateString() === now.toDateString()
+                  }).length
+                  const hasOverdue = overdueCount > 0
+                  
+                  return (
+                    <div className={`rounded-md border p-1.5 mb-1 transition-all ${
+                      hasOverdue 
+                        ? 'bg-red-50 border-red-300 reminder-column-active' 
+                        : todayRemindersCount > 0 
+                          ? 'bg-amber-50 border-amber-200' 
+                          : 'bg-amber-50/50 border-amber-200/50'
+                    }`}>
+                      <div className="flex items-center gap-1">
+                        <Bell className={`w-3 h-3 ${hasOverdue ? 'text-red-500 animate-pulse' : 'text-amber-600'}`} />
+                        <span className={`font-semibold text-xs ${hasOverdue ? 'text-red-700' : 'text-amber-700'}`}>
+                          {hasOverdue ? 'Atrasados!' : 'Lembretes Hoje'}
+                        </span>
+                        <Badge 
+                          variant="secondary" 
+                          className={`text-[10px] h-4 px-1 ${
+                            hasOverdue 
+                              ? 'bg-red-100 text-red-700 animate-pulse' 
+                              : 'bg-amber-100 text-amber-700'
+                          }`}
+                        >
+                          {todayRemindersCount}
+                        </Badge>
+                      </div>
+                    </div>
+                  )
+                })()}
                 
                 <div className="flex-1 overflow-y-auto">
                   <div className="space-y-1">
