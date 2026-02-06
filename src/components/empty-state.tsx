@@ -4,7 +4,7 @@ import { MessageCircle, Users, Inbox, Search, Wifi, Download, ArrowRight, Sparkl
 import { Button } from '@/components/ui/button'
 
 interface EmptyStateProps {
-  type: 'no-leads' | 'no-messages' | 'no-results' | 'not-connected' | 'error'
+  type: 'no-leads' | 'no-messages' | 'no-results' | 'not-connected' | 'error' | 'no-reminders'
   onAction?: () => void
   actionLabel?: string
   secondaryAction?: () => void
@@ -68,6 +68,18 @@ export function EmptyState({ type, onAction, actionLabel, secondaryAction, secon
         '🔄 Verifique sua conexão com a internet',
         '📱 Confirme que o WhatsApp está conectado',
         '⏱️ Aguarde alguns segundos e tente novamente'
+      ]
+    },
+    // UX #131: Empty state for reminders page
+    'no-reminders': {
+      icon: Inbox,
+      title: 'Nenhum lembrete ativo',
+      description: 'Crie lembretes para não esquecer de fazer follow-up com seus leads.',
+      gradient: 'from-amber-500/20 to-yellow-500/20',
+      tips: [
+        '🔔 Clique no ícone de sino em qualquer lead',
+        '⏰ Escolha data e hora para ser lembrado',
+        '📝 Adicione uma nota para lembrar o contexto'
       ]
     }
   }
