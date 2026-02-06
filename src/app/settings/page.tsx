@@ -258,6 +258,7 @@ export default function SettingsPage() {
   }
 
   // Bug fix #13: Importar dados de backup
+  // Bug fix #353: Validate backup version and structure
   const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -267,8 +268,23 @@ export default function SettingsPage() {
       try {
         const data = JSON.parse(e.target?.result as string)
         
+        // Bug fix #353: Validate backup structure
         if (!data.leads || !Array.isArray(data.leads)) {
-          setMessage({ type: 'error', text: 'Arquivo de backup inválido.' })
+          setMessage({ type: 'error', text: 'Arquivo de backup inválido. Estrutura incorreta.' })
+          return
+        }
+        
+        // Bug fix #353: Validate version compatibility
+        const supportedVersions = ['1.0.0', '1.0.1', '1.1.0']
+        if (data.version && !supportedVersions.includes(data.version)) {
+          setMessage({ type: 'error', text: `Versão de backup incompatível: ${data.version}. Suportadas: ${supportedVersions.join(', ')}` })
+          return
+        }
+        
+        // Bug fix #353: Validate lead structure (basic sanity check)
+        const invalidLeads = data.leads.filter((lead: any) => !lead.id || !lead.phone)
+        if (invalidLeads.length > 0) {
+          setMessage({ type: 'error', text: `Backup contém ${invalidLeads.length} leads inválidos (sem id ou telefone).` })
           return
         }
         
@@ -284,10 +300,12 @@ export default function SettingsPage() {
           localStorage.setItem('whatszap-read-leads', JSON.stringify(data.readLeads))
         }
         
-        setMessage({ type: 'success', text: `Backup restaurado! ${data.leads.length} leads importados.` })
+        // Bug fix #353: Show export date in success message
+        const exportDate = data.exportedAt ? new Date(data.exportedAt).toLocaleDateString('pt-BR') : 'desconhecida'
+        setMessage({ type: 'success', text: `Backup restaurado! ${data.leads.length} leads importados (backup de ${exportDate}).` })
         setTimeout(() => window.location.reload(), 1500)
       } catch (err) {
-        setMessage({ type: 'error', text: 'Erro ao ler arquivo de backup.' })
+        setMessage({ type: 'error', text: 'Erro ao ler arquivo de backup. Verifique se é um JSON válido.' })
       }
     }
     reader.readAsText(file)

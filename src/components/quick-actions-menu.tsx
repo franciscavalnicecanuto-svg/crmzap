@@ -31,9 +31,11 @@ interface QuickActionsMenuProps {
 
 const QUICK_ACTIONS: QuickAction[] = [
   { id: 'send_quick', icon: MessageCircle, label: 'Enviar mensagem', color: 'text-green-600' },
+  { id: 'copy_phone', icon: Plus, label: 'Copiar telefone', color: 'text-gray-600' }, // UX #350: Quick copy phone
   { id: 'mark_read', icon: Check, label: 'Marcar como lido', color: 'text-green-600' },
   { id: 'add_tag', icon: Tag, label: 'Adicionar tag', color: 'text-blue-600' },
   { id: 'add_reminder', icon: Bell, label: 'Criar lembrete', color: 'text-amber-600' },
+  { id: 'move_to', icon: ExternalLink, label: 'Mover para...', color: 'text-purple-600' }, // UX #351: Quick move to column
   { id: 'open_whatsapp', icon: ExternalLink, label: 'Abrir no WhatsApp', color: 'text-green-500' },
   { id: 'delete', icon: Trash2, label: 'Remover', color: 'text-red-500', dangerous: true },
 ]
@@ -201,21 +203,36 @@ export function useLongPress(
  * Floating Action Button for Mobile
  * Shows quick actions as a FAB
  * UX #130: Enhanced with more useful actions and better visual feedback
+ * UX #352: Added pending reminders badge
  */
 export function MobileQuickActionsFAB({
   onNewLead,
   onSync,
   onOpenReminders,
   onOpenSearch,
+  pendingReminders = 0, // UX #352: Show badge for pending reminders
   className = ''
 }: {
   onNewLead?: () => void
   onSync?: () => void
   onOpenReminders?: () => void
   onOpenSearch?: () => void
+  pendingReminders?: number
   className?: string
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const [pulseReminder, setPulseReminder] = useState(false)
+  
+  // UX #352: Pulse animation when there are pending reminders
+  useEffect(() => {
+    if (pendingReminders > 0 && !isExpanded) {
+      const interval = setInterval(() => {
+        setPulseReminder(prev => !prev)
+      }, 2000)
+      return () => clearInterval(interval)
+    }
+    setPulseReminder(false)
+  }, [pendingReminders, isExpanded])
 
   // Close when clicking outside
   useEffect(() => {
@@ -231,10 +248,10 @@ export function MobileQuickActionsFAB({
   }, [isExpanded])
 
   const actions = [
-    { onClick: onOpenSearch, icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>, label: 'Buscar', color: 'bg-gray-600' },
-    { onClick: onOpenReminders, icon: <Bell className="w-5 h-5" />, label: 'Lembretes', color: 'bg-amber-500' },
-    { onClick: onSync, icon: <Clock className="w-5 h-5" />, label: 'Sincronizar', color: 'bg-blue-500' },
-    { onClick: onNewLead, icon: <MessageCircle className="w-5 h-5" />, label: 'Novo lead', color: 'bg-green-500' },
+    { onClick: onOpenSearch, icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>, label: 'Buscar', color: 'bg-gray-600', badge: 0 },
+    { onClick: onOpenReminders, icon: <Bell className="w-5 h-5" />, label: 'Lembretes', color: 'bg-amber-500', badge: pendingReminders },
+    { onClick: onSync, icon: <Clock className="w-5 h-5" />, label: 'Sincronizar', color: 'bg-blue-500', badge: 0 },
+    { onClick: onNewLead, icon: <MessageCircle className="w-5 h-5" />, label: 'Novo lead', color: 'bg-green-500', badge: 0 },
   ].filter(a => a.onClick)
 
   return (
@@ -254,13 +271,24 @@ export function MobileQuickActionsFAB({
             <div key={idx} className="flex items-center gap-3 justify-end">
               <span className="bg-gray-900/90 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
                 {action.label}
+                {action.badge > 0 && (
+                  <span className="ml-1.5 px-1.5 py-0.5 bg-red-500 rounded-full text-[10px] font-bold">
+                    {action.badge > 9 ? '9+' : action.badge}
+                  </span>
+                )}
               </span>
               <button
                 onClick={() => { action.onClick?.(); setIsExpanded(false); if ('vibrate' in navigator) navigator.vibrate(10) }}
-                className={`w-12 h-12 rounded-full ${action.color} text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform touch-manipulation`}
+                className={`w-12 h-12 rounded-full ${action.color} text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform touch-manipulation relative`}
                 aria-label={action.label}
               >
                 {action.icon}
+                {/* UX #352: Badge on button */}
+                {action.badge > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold flex items-center justify-center border-2 border-white">
+                    {action.badge > 9 ? '9+' : action.badge}
+                  </span>
+                )}
               </button>
             </div>
           ))}
@@ -270,9 +298,9 @@ export function MobileQuickActionsFAB({
       {/* Main FAB */}
       <button
         onClick={() => { setIsExpanded(!isExpanded); if ('vibrate' in navigator) navigator.vibrate(10) }}
-        className={`w-14 h-14 rounded-full shadow-xl flex items-center justify-center active:scale-95 transition-all touch-manipulation ${
+        className={`w-14 h-14 rounded-full shadow-xl flex items-center justify-center active:scale-95 transition-all touch-manipulation relative ${
           isExpanded ? 'rotate-45 bg-gray-700' : 'bg-green-600'
-        }`}
+        } ${pulseReminder ? 'animate-pulse ring-4 ring-amber-400/50' : ''}`}
         aria-label={isExpanded ? 'Fechar' : 'Ações rápidas'}
         aria-expanded={isExpanded}
       >
@@ -280,6 +308,12 @@ export function MobileQuickActionsFAB({
           <X className="w-6 h-6 text-white" />
         ) : (
           <Plus className="w-7 h-7 text-white" />
+        )}
+        {/* UX #352: Badge on main FAB when collapsed */}
+        {!isExpanded && pendingReminders > 0 && (
+          <span className="absolute -top-1 -right-1 w-6 h-6 bg-red-500 rounded-full text-xs font-bold flex items-center justify-center border-2 border-white animate-bounce">
+            {pendingReminders > 9 ? '9+' : pendingReminders}
+          </span>
         )}
       </button>
     </div>

@@ -15,6 +15,7 @@ import { ConnectionStatus } from '@/components/connection-status'
 import { OnboardingTour } from '@/components/onboarding-tour'
 import { KeyboardShortcutsModal, useKeyboardShortcuts } from '@/components/keyboard-shortcuts'
 import { logAction, ActionHistory } from '@/components/action-history'
+import { MobileQuickActionsFAB } from '@/components/quick-actions-menu' // UX #352: Mobile FAB with reminders badge
 // ReportsModal moved to /reports page
 import { useSettings } from '@/components/theme-provider'
 import { useDebounce } from '@/hooks/use-debounce'
@@ -3107,6 +3108,23 @@ function DashboardContent() {
         </div>
       )}
 
+      {/* UX #352: Mobile FAB with pending reminders badge */}
+      <MobileQuickActionsFAB 
+        onSync={() => syncMessages()}
+        onOpenReminders={() => router.push('/reminders')}
+        onOpenSearch={() => {
+          // Focus search input on mobile
+          const searchInput = document.querySelector('input[placeholder*="Buscar"]') as HTMLInputElement
+          if (searchInput) searchInput.focus()
+        }}
+        pendingReminders={leads.filter(l => {
+          if (!l.reminderDate) return false
+          const reminderTime = new Date(l.reminderDate).getTime()
+          const now = Date.now()
+          return reminderTime <= now || reminderTime <= now + 3600000 // Due or within 1h
+        }).length}
+      />
+      
       {/* Onboarding Tour */}
       <OnboardingTour />
       
