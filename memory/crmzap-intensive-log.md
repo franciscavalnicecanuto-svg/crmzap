@@ -1,6 +1,52 @@
 # CRMZap - Log de Melhoria Intensiva
 
-## 2025-02-06 00:10 - Sessão Intensiva
+## 2025-02-06 00:32 - Sessão Intensiva #2
+
+### 🎯 Resumo
+Continuação das melhorias com foco em UX de lembretes e chat.
+
+---
+
+## ✅ Melhorias Implementadas (Sessão #2)
+
+### 1. Dashboard - Lembretes (dashboard/page.tsx)
+**UX Improvements:**
+- **#75**: Quick Snooze buttons no modal de lembrete (15min, 1h, 3h, Amanhã 9h)
+- Haptic feedback ao clicar nos botões de atalho
+
+**Bug Fixes:**
+- **#73**: `getRelativeTime` agora trata datas futuras graciosamente (clock skew, timezone)
+- **#74**: `kanbanColumns` localStorage com validação de estrutura + fallback para defaults
+- **#76**: `datetime-local min` recalculado em cada render (não mais estático)
+
+### 2. Chat Panel (chat-panel.tsx)
+**UX Improvements:**
+- **#77**: Mensagens agrupadas por data com separadores visuais ("Hoje", "Ontem", "DD/MM")
+- Melhora significativa na leitura de conversas longas
+
+### 3. Reminders Page (reminders/page.tsx)
+**UX Improvements:**
+- **#78**: Botões de snooze rápido (+1h, +3h) para lembretes atrasados
+
+---
+
+## 📊 Commits
+
+1. `feat(ux): add quick snooze, date grouping, and bug fixes`
+   - 3 arquivos alterados (dashboard, chat-panel, reminders)
+   - UX #75-78, Bug fixes #73-74, #76
+
+---
+
+## 🚀 Deploy
+
+**URL:** https://whatszap-zeta.vercel.app
+**Status:** ✅ Deployed
+**Timestamp:** 2025-02-06 00:45
+
+---
+
+## 2025-02-06 00:10 - Sessão Intensiva #1
 
 ### 🎯 Resumo
 Sessão de 10 horas focada em UX, bugs e features.
