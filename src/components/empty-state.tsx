@@ -1,10 +1,10 @@
 'use client'
 
-import { MessageCircle, Users, Inbox, Search, Wifi, Download, ArrowRight, Sparkles, Zap, RefreshCw, Clock, Bell, Tag } from 'lucide-react'
+import { MessageCircle, Users, Inbox, Search, Wifi, Download, ArrowRight, Sparkles, Zap, RefreshCw, Clock, Bell, Tag, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface EmptyStateProps {
-  type: 'no-leads' | 'no-messages' | 'no-results' | 'not-connected' | 'error' | 'no-reminders'
+  type: 'no-leads' | 'no-messages' | 'no-results' | 'not-connected' | 'error' | 'no-reminders' | 'loading'
   onAction?: () => void
   actionLabel?: string
   secondaryAction?: () => void
@@ -71,6 +71,18 @@ export function EmptyState({ type, onAction, actionLabel, secondaryAction, secon
         '⏱️ Aguarde alguns segundos e tente novamente'
       ]
     },
+    // UX #804: Loading state for better perceived performance
+    'loading': {
+      icon: Loader2,
+      title: 'Carregando...',
+      description: 'Buscando suas conversas e contatos.',
+      gradient: 'from-blue-500/20 to-cyan-500/20',
+      tips: [
+        '⏳ Isso pode levar alguns segundos',
+        '📱 Verificando conexão com WhatsApp',
+        '💾 Carregando histórico de mensagens'
+      ]
+    },
     // UX #131: Empty state for reminders page
     'no-reminders': {
       icon: Inbox,
@@ -95,7 +107,7 @@ export function EmptyState({ type, onAction, actionLabel, secondaryAction, secon
       <div className={`relative w-24 h-24 rounded-full bg-gradient-to-br ${config.gradient} flex items-center justify-center mb-5 empty-state-glow`}>
         <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/20 to-transparent" />
         <div className="w-16 h-16 rounded-full bg-background/90 flex items-center justify-center shadow-lg backdrop-blur-sm">
-          <Icon className="w-8 h-8 text-muted-foreground" aria-hidden="true" />
+          <Icon className={`w-8 h-8 text-muted-foreground ${type === 'loading' ? 'animate-spin' : ''}`} aria-hidden="true" />
         </div>
         {/* Decorative dots - UX #173: Reduced motion for accessibility */}
         <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-400 motion-safe:animate-ping" />
