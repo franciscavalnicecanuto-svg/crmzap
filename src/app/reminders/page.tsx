@@ -96,23 +96,27 @@ export default function RemindersPage() {
   }
   
   // UX #127: Bulk actions for reminders
+  // Bug fix #51: Batch localStorage operations (read once, write once)
   const markAllOverdueAsDone = () => {
     const overdueLeads = filteredLeads.filter(l => getReminderStatus(l.reminderDate!) === 'overdue')
     if (overdueLeads.length === 0) return
     
-    overdueLeads.forEach(lead => {
-      // Save to history
-      const history = JSON.parse(localStorage.getItem('whatszap-completed-reminders') || '[]')
-      history.unshift({
-        leadId: lead.id,
-        leadName: lead.name,
-        phone: lead.phone,
-        reminderDate: lead.reminderDate,
-        reminderNote: lead.reminderNote,
-        completedAt: new Date().toISOString()
-      })
-      localStorage.setItem('whatszap-completed-reminders', JSON.stringify(history.slice(0, 50)))
-    })
+    // Read history once, add all entries, write once
+    const history = JSON.parse(localStorage.getItem('whatszap-completed-reminders') || '[]')
+    const completedAt = new Date().toISOString()
+    
+    const newEntries = overdueLeads.map(lead => ({
+      leadId: lead.id,
+      leadName: lead.name,
+      phone: lead.phone,
+      reminderDate: lead.reminderDate,
+      reminderNote: lead.reminderNote,
+      completedAt
+    }))
+    
+    // Prepend all new entries and keep only last 50
+    const updatedHistory = [...newEntries, ...history].slice(0, 50)
+    localStorage.setItem('whatszap-completed-reminders', JSON.stringify(updatedHistory))
     
     // Clear all overdue reminders
     const updated = leads.map(l => 

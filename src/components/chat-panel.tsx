@@ -795,8 +795,34 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
           </div>
           <div>
             <h3 className="font-medium text-sm">{lead.name}</h3>
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              {lead.phone}
+            {/* UX #155: Phone with copy button */}
+            <p className="text-xs text-muted-foreground flex items-center gap-1 group">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(lead.phone.replace(/\D/g, ''))
+                  // Show feedback
+                  const btn = document.activeElement as HTMLButtonElement
+                  if (btn) {
+                    const originalTitle = btn.title
+                    btn.title = 'Copiado!'
+                    setTimeout(() => { btn.title = originalTitle }, 1500)
+                  }
+                  // Haptic
+                  if ('vibrate' in navigator) navigator.vibrate(10)
+                }}
+                className="hover:text-foreground hover:underline underline-offset-2 transition-colors cursor-pointer"
+                title="Clique para copiar"
+              >
+                {lead.phone}
+              </button>
+              <Copy 
+                className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity cursor-pointer hover:opacity-100"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  navigator.clipboard.writeText(lead.phone.replace(/\D/g, ''))
+                  if ('vibrate' in navigator) navigator.vibrate(10)
+                }}
+              />
               {/* UX #98: Show last message time if available */}
               {messages.length > 0 && messages[messages.length - 1]?.timestamp && (
                 <span className="text-[10px] opacity-60">

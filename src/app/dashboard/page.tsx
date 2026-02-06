@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/empty-state'
 import { DashboardSkeleton, LeadCardSkeleton } from '@/components/lead-card-skeleton'
 import { ConnectionStatus } from '@/components/connection-status'
 import { OnboardingTour } from '@/components/onboarding-tour'
+import { KeyboardShortcutsModal, useKeyboardShortcuts } from '@/components/keyboard-shortcuts'
 import { logAction, ActionHistory } from '@/components/action-history'
 // ReportsModal moved to /reports page
 import { useSettings } from '@/components/theme-provider'
@@ -325,6 +326,9 @@ function DashboardContent() {
   const searchParams = useSearchParams()
   const { showToast } = useToast()
   const { settings } = useSettings()
+  
+  // UX #153: Keyboard shortcuts help modal
+  const { showHelp: showKeyboardHelp, setShowHelp: setShowKeyboardHelp } = useKeyboardShortcuts()
   
   // Bug fix #1: Atualizar selectedLead quando leads muda
   // Bug fix #29: Only update if lead data actually changed (avoid infinite loops)
@@ -2349,6 +2353,12 @@ function DashboardContent() {
 
       {/* Onboarding Tour */}
       <OnboardingTour />
+      
+      {/* UX #153: Keyboard shortcuts help modal */}
+      <KeyboardShortcutsModal 
+        isOpen={showKeyboardHelp} 
+        onClose={() => setShowKeyboardHelp(false)} 
+      />
     </div>
   )
 }

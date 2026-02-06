@@ -1,5 +1,63 @@
 # CRMZap - Log de Melhoria Intensiva
 
+## 2026-02-06 04:24 - Sessão Intensiva #4
+
+### 🎯 Resumo
+Melhorias focadas em validação de formulários, UX de conexão e modais customizados.
+
+---
+
+## ✅ Melhorias Implementadas (Sessão #4)
+
+### 1. Subscription Page (subscription/page.tsx)
+**UX Improvements:**
+- **#150**: Modal customizado para upgrade (substituiu `alert()` nativo)
+  - Design moderno com gradiente e ícone Sparkles
+  - Botões de contato via WhatsApp e Email
+  - Backdrop blur e animações suaves
+  - Fechar com ESC ou clique fora
+
+### 2. Connect Page (connect/page.tsx)
+**UX Improvements:**
+- **#151**: Verificação manual de conexão
+  - Botão "Já escaneei" para verificar conexão manualmente
+  - Contador de tentativas com dicas contextuais
+  - Dicas progressivas: "Verificando..." → "Aguarde sincronizar..." → "Feche e abra o WhatsApp"
+  - Haptic feedback em mobile
+
+### 3. Login Page (login/page.tsx)
+**Bug Fixes + UX:**
+- **#152**: Validação em tempo real de campos
+  - Email: validação de formato no blur
+  - Senha: mínimo 6 caracteres
+  - Visual feedback (bordas vermelhas, ícones)
+  - Aria attributes para acessibilidade
+  - Limpa erros ao digitar
+- Mensagens de erro em português
+  - "Invalid login credentials" → "Email ou senha incorretos"
+  - "Email not confirmed" → "Confirme seu email antes de entrar"
+  - "Too many requests" → "Muitas tentativas. Aguarde um momento."
+- Haptic feedback em erro/sucesso
+
+---
+
+## 📊 Commits
+
+1. `feat(ux): improve subscription modal, connect page, and login validation`
+   - 3 arquivos alterados (subscription, connect, login)
+   - UX #150, #151
+   - Bug fix #152
+
+---
+
+## 🚀 Deploy
+
+**URL:** https://whatszap-zeta.vercel.app
+**Status:** ✅ Deployed
+**Timestamp:** 2026-02-06 04:30
+
+---
+
 ## 2026-02-06 00:40 - Sessão Intensiva #3
 
 ### 🎯 Resumo

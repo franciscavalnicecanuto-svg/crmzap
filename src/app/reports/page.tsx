@@ -21,8 +21,16 @@ import {
   Minus,
   Download,
   Loader2,
-  FileText
+  FileText,
+  FileSpreadsheet,
+  ChevronDown
 } from 'lucide-react'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { getUser } from '@/lib/supabase-client'
 import { SettingsNav } from '@/components/settings-nav'
 
@@ -473,7 +481,65 @@ export default function ReportsPage() {
       pdf.save(`relatorio-crmzap-${new Date().toISOString().split('T')[0]}.pdf`)
     } catch (err) {
       console.error('Failed to export PDF:', err)
-      alert('Erro ao exportar PDF. Tente novamente.')
+      // UX #157: Better error feedback with toast-like message
+      const errorDiv = document.createElement('div')
+      errorDiv.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-in slide-in-from-bottom-4'
+      errorDiv.textContent = 'Erro ao exportar PDF. Tente novamente.'
+      document.body.appendChild(errorDiv)
+      setTimeout(() => errorDiv.remove(), 3000)
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  // Feature #156: Export to CSV
+  const exportToCSV = () => {
+    setIsExporting(true)
+    try {
+      // CSV headers
+      const headers = ['Nome', 'Telefone', 'Status', 'Valor', 'Tags', 'Criado Em', 'Lembrete']
+      
+      // Convert leads to CSV rows
+      const rows = leads.map(lead => [
+        `"${(lead.name || '').replace(/"/g, '""')}"`,
+        lead.phone || '',
+        lead.status || '',
+        lead.value || 0,
+        `"${(lead.tags || []).join(', ')}"`,
+        lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('pt-BR') : '',
+        lead.reminderDate ? new Date(lead.reminderDate).toLocaleString('pt-BR') : ''
+      ])
+      
+      // Combine headers and rows
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+      ].join('\n')
+      
+      // Add BOM for Excel UTF-8 compatibility
+      const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `leads-crmzap-${new Date().toISOString().split('T')[0]}.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      
+      // Success feedback
+      const successDiv = document.createElement('div')
+      successDiv.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-in slide-in-from-bottom-4'
+      successDiv.textContent = 'CSV exportado com sucesso!'
+      document.body.appendChild(successDiv)
+      setTimeout(() => successDiv.remove(), 2000)
+    } catch (err) {
+      console.error('Failed to export CSV:', err)
+      const errorDiv = document.createElement('div')
+      errorDiv.className = 'fixed bottom-4 left-1/2 -translate-x-1/2 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 animate-in slide-in-from-bottom-4'
+      errorDiv.textContent = 'Erro ao exportar CSV.'
+      document.body.appendChild(errorDiv)
+      setTimeout(() => errorDiv.remove(), 3000)
     } finally {
       setIsExporting(false)
     }
@@ -634,19 +700,34 @@ export default function ReportsPage() {
             </Link>
             <h1 className="font-semibold">Relatórios</h1>
           </div>
-          <Button 
-            onClick={exportToPDF} 
-            disabled={isExporting}
-            size="sm"
-            className="gap-2"
-          >
-            {isExporting ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <FileText className="w-4 h-4" />
-            )}
-            Exportar PDF
-          </Button>
+          {/* Feature #156: Export dropdown with PDF and CSV options */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                disabled={isExporting}
+                size="sm"
+                className="gap-2"
+              >
+                {isExporting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Download className="w-4 h-4" />
+                )}
+                Exportar
+                <ChevronDown className="w-3 h-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={exportToPDF} disabled={isExporting}>
+                <FileText className="w-4 h-4 mr-2" />
+                Exportar PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={exportToCSV} disabled={isExporting}>
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Exportar CSV
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 

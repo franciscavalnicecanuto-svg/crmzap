@@ -1,5 +1,42 @@
 # WhatsZap Bug Hunt Log
 
+## 2026-02-06 04:45 - Ciclo 11
+
+**Arquivos analisados:**
+- `src/app/reminders/page.tsx` (402 linhas)
+- `src/app/dashboard/page.tsx` (2368 linhas - completo)
+- `src/components/chat-panel.tsx` (1305 linhas - completo)
+
+**Status:** ✅ 1 bug corrigido e deployado
+
+**Bug corrigido:**
+
+### Bug #51: markAllOverdueAsDone faz múltiplas escritas no localStorage
+**Arquivo:** `reminders/page.tsx` linha ~64-94
+**Problema:** A função `markAllOverdueAsDone` fazia N leituras e N escritas no localStorage para N lembretes atrasados. Isso é ineficiente e pode causar jank em dispositivos lentos com muitos lembretes.
+**Código antigo:**
+```javascript
+overdueLeads.forEach(lead => {
+  const history = JSON.parse(localStorage.getItem('...') || '[]')
+  history.unshift({...})
+  localStorage.setItem('...', JSON.stringify(history.slice(0, 50)))
+})
+```
+**Solução:** Refatorado para ler uma vez, processar todos, e escrever uma vez:
+```javascript
+const history = JSON.parse(localStorage.getItem('...') || '[]')
+const newEntries = overdueLeads.map(lead => ({...}))
+const updatedHistory = [...newEntries, ...history].slice(0, 50)
+localStorage.setItem('...', JSON.stringify(updatedHistory))
+```
+**Impacto:** Performance melhorada em ~N×2 operações de I/O para qualquer bulk action.
+
+**Deploy:** ✅ https://whatszap-zeta.vercel.app
+
+**Nota:** Código muito maduro (51+ bugs corrigidos). Próximos bugs serão mais sutis.
+
+---
+
 ## 2026-02-06 01:13 - Ciclo 10
 
 **Arquivos analisados:**
