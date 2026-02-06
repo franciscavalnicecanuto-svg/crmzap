@@ -162,4 +162,42 @@
 
 ---
 
-*Última atualização: 2026-02-06 13:45*
+## 🔧 Sessão 2: 2026-02-06 14:10
+
+### 🛠️ Bug Fixes
+
+#### Bug #625: Snooze shortcuts conflitam com busca
+**Arquivo:** `src/app/reminders/page.tsx`
+**Problema:** Ao digitar números (1-5) no campo de busca, disparava snooze
+**Solução:** Adicionado `if (document.activeElement === searchInputRef.current) return` antes dos snooze handlers
+**Commit:** `6f3bd07`
+
+#### Bug #626: Profile permite salvar telefone incompleto
+**Arquivo:** `src/app/profile/page.tsx`
+**Problema:** Botão salvar habilitado mesmo com telefone parcial (ex: "(85) 9")
+**Solução:** Desabilitar save se `phone.replace(/\D/g, '').length > 0 && < 10`
+**Commit:** `6f3bd07`
+
+### 🎨 UX Melhorias
+
+#### UX #627: Feedback visual para nome obrigatório
+**Arquivo:** `src/app/profile/page.tsx`
+**Descrição:**
+- Input fica com borda vermelha quando nome está vazio
+- Mensagem "O nome é obrigatório" aparece abaixo
+- Botão salvar desabilitado com tooltip explicativo
+**Commit:** `6f3bd07`
+
+---
+
+## 📊 Resumo Sessão 2
+
+| Categoria | Quantidade |
+|-----------|------------|
+| Bugs Corrigidos | 2 |
+| Melhorias UX | 1 |
+| Commits | 1 |
+
+---
+
+*Última atualização: 2026-02-06 14:15*
