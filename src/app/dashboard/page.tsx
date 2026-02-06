@@ -311,6 +311,7 @@ function DashboardContent() {
   const [isImporting, setIsImporting] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
   const [syncProgress, setSyncProgress] = useState(0) // UX: Visual sync progress (0-100)
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null) // UX #180: Track last sync time
   const [importError, setImportError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -507,6 +508,16 @@ function DashboardContent() {
       } catch (e) {
         console.error('Failed to parse kanban columns:', e)
         localStorage.setItem('whatszap-kanban-columns', JSON.stringify(defaultKanbanColumns))
+      }
+    }
+    
+    // UX #180: Load last sync time from localStorage
+    const savedSyncTime = localStorage.getItem('whatszap-last-sync')
+    if (savedSyncTime) {
+      try {
+        setLastSyncTime(new Date(savedSyncTime))
+      } catch (e) {
+        console.error('Failed to parse last sync time:', e)
       }
     }
     
@@ -848,6 +859,11 @@ function DashboardContent() {
           ? `✅ ${data.saved} mensagens sincronizadas!`
           : '✅ Tudo sincronizado (sem novas mensagens)'
         showToast(syncMessage, 'success')
+        
+        // UX #180: Update last sync time
+        const now = new Date()
+        setLastSyncTime(now)
+        localStorage.setItem('whatszap-last-sync', now.toISOString())
         
         // After sync, reload leads
         await importFromWhatsApp()
@@ -1429,6 +1445,24 @@ function DashboardContent() {
             </div>
             
             <div className="flex items-center gap-1">
+              {/* UX #180: Last sync indicator */}
+              {lastSyncTime && (
+                <div className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground mr-1" title={`Última sincronização: ${lastSyncTime.toLocaleString('pt-BR')}`}>
+                  <RefreshCw className="w-3 h-3" />
+                  <span>
+                    {(() => {
+                      const diffMs = Date.now() - lastSyncTime.getTime()
+                      const diffMins = Math.floor(diffMs / 60000)
+                      if (diffMins < 1) return 'agora'
+                      if (diffMins < 60) return `${diffMins}min`
+                      const diffHours = Math.floor(diffMins / 60)
+                      if (diffHours < 24) return `${diffHours}h`
+                      const diffDays = Math.floor(diffHours / 24)
+                      return `${diffDays}d`
+                    })()}
+                  </span>
+                </div>
+              )}
               <Link href="/connect">
                 <Button 
                   variant={isConnected ? 'outline' : 'default'}

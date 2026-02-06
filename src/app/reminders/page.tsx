@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,8 @@ import {
   X,
   CheckCircle,
   AlertCircle,
-  ChevronRight
+  ChevronRight,
+  Search
 } from 'lucide-react'
 import { getUser } from '@/lib/supabase-client'
 import { SettingsNav } from '@/components/settings-nav'
@@ -51,6 +52,8 @@ export default function RemindersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [completedReminders, setCompletedReminders] = useState<CompletedReminder[]>([])
   const [completingId, setCompletingId] = useState<string | null>(null) // UX: Animation state
+  const [selectedIndex, setSelectedIndex] = useState(0) // UX #181: Keyboard navigation
+  const searchInputRef = useRef<HTMLInputElement>(null) // UX #181: Focus search with Ctrl+K
 
   useEffect(() => {
     async function load() {
@@ -78,6 +81,72 @@ export default function RemindersPage() {
     }
     load()
   }, [router])
+
+  // UX #181: Keyboard shortcuts for reminders page
+  // Note: filteredLeads computed later, so we access it via ref pattern
+  const filteredLeadsRef = useRef<Lead[]>([])
+  
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const currentFiltered = filteredLeadsRef.current
+      
+      // Ctrl+K or Cmd+K to focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+        return
+      }
+      
+      // Escape to clear search or blur input
+      if (e.key === 'Escape') {
+        if (searchTerm) {
+          setSearchTerm('')
+        }
+        searchInputRef.current?.blur()
+        return
+      }
+      
+      // Don't handle navigation if typing in input
+      if (document.activeElement === searchInputRef.current) return
+      
+      // Arrow keys for navigation
+      if (e.key === 'ArrowDown' || e.key === 'j') {
+        e.preventDefault()
+        setSelectedIndex(prev => Math.min(prev + 1, currentFiltered.length - 1))
+      }
+      if (e.key === 'ArrowUp' || e.key === 'k') {
+        e.preventDefault()
+        setSelectedIndex(prev => Math.max(prev - 1, 0))
+      }
+      
+      // Enter to open selected lead
+      if (e.key === 'Enter' && currentFiltered.length > 0) {
+        e.preventDefault()
+        const selectedLead = currentFiltered[selectedIndex]
+        if (selectedLead) {
+          router.push(`/dashboard?lead=${selectedLead.id}`)
+        }
+      }
+      
+      // 'd' to mark as done
+      if (e.key === 'd' && currentFiltered.length > 0) {
+        e.preventDefault()
+        const selectedLead = currentFiltered[selectedIndex]
+        if (selectedLead) {
+          markAsDone(selectedLead.id)
+        }
+      }
+    }
+    
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [searchTerm, selectedIndex, router])
+  
+  // Reset selected index when filtered results change
+  useEffect(() => {
+    setSelectedIndex(0)
+  }, [filter, searchTerm])
 
   const clearReminder = (leadId: string) => {
     const updated = leads.map(l => 
@@ -203,6 +272,9 @@ export default function RemindersPage() {
   }
 
   const filteredLeads = getFilteredLeads()
+  
+  // UX #181: Keep ref in sync for keyboard navigation
+  filteredLeadsRef.current = filteredLeads
 
   // Stats (Bug fix: mutually exclusive counts)
   // UX improvement: Added completed count for last 7 days
@@ -369,15 +441,41 @@ export default function RemindersPage() {
           </div>
         )}
 
-        {/* Search */}
-        <div className="mb-4">
+        {/* Search - UX #181: Added keyboard shortcut hint */}
+        <div className="mb-4 relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
-            placeholder="Buscar por nome, telefone ou nota..."
+            ref={searchInputRef}
+            placeholder="Buscar por nome, telefone ou nota... (Ctrl+K)"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="max-w-md"
+            className="pl-9 pr-8"
           />
+          {searchTerm && (
+            <button
+              onClick={() => setSearchTerm('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center"
+              title="Limpar (Escape)"
+            >
+              <X className="w-3 h-3 text-muted-foreground" />
+            </button>
+          )}
         </div>
+        
+        {/* UX #181: Keyboard shortcuts hint */}
+        {filteredLeads.length > 0 && (
+          <div className="text-[10px] text-muted-foreground mb-3 flex items-center gap-3">
+            <span className="flex items-center gap-1">
+              <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">↑↓</kbd> navegar
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">Enter</kbd> abrir
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">D</kbd> marcar feito
+            </span>
+          </div>
+        )}
 
         {/* UX #131: Quick create reminder section */}
         {leadsWithReminders.length > 0 && (
@@ -484,20 +582,28 @@ export default function RemindersPage() {
           </div>
         ) : filter !== 'completed' && (
           <div className="space-y-3">
-            {filteredLeads.map(lead => {
+            {filteredLeads.map((lead, index) => {
               const status = getReminderStatus(lead.reminderDate!)
+              const isSelected = index === selectedIndex
               return (
                 <Card 
                   key={lead.id}
-                  className={`p-4 transition-all hover:shadow-md ${
+                  className={`p-4 transition-all hover:shadow-md cursor-pointer ${
                     completingId === lead.id 
                       ? 'opacity-0 scale-95 translate-x-4 duration-400' 
                       : 'opacity-100 scale-100 translate-x-0 duration-200'
+                  } ${
+                    isSelected 
+                      ? 'ring-2 ring-green-500 shadow-md' 
+                      : ''
                   } ${
                     status === 'overdue' ? 'border-red-300 bg-red-50/50' :
                     status === 'today' ? 'border-amber-300 bg-amber-50/50' :
                     ''
                   }`}
+                  onClick={() => router.push(`/dashboard?lead=${lead.id}`)}
+                  tabIndex={0}
+                  onFocus={() => setSelectedIndex(index)}
                 >
                   <div className="flex items-start gap-4">
                     {/* Status Icon */}
