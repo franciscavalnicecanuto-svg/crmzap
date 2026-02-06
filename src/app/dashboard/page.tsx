@@ -103,24 +103,34 @@ const TAG_OPTIONS = [
 
 // UX #71: Relative time helper for "last message X ago"
 // Bug fix #73: Handle future dates gracefully (timezone issues, clock skew)
+// Bug fix #266: Handle invalid timestamps gracefully
 const getRelativeTime = (dateStr: string | undefined): string | null => {
   if (!dateStr) return null
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diffMs = now.getTime() - date.getTime()
   
-  // Bug fix #73: If date is in the future (clock skew, timezone), show nothing
-  if (diffMs < 0) return null
-  
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-  
-  if (diffMins < 1) return 'agora'
-  if (diffMins < 60) return `${diffMins}m`
-  if (diffHours < 24) return `${diffHours}h`
-  if (diffDays < 7) return `${diffDays}d`
-  return null // Don't show if older than a week
+  try {
+    const date = new Date(dateStr)
+    // Bug fix #266: Check for Invalid Date (NaN)
+    if (isNaN(date.getTime())) return null
+    
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    
+    // Bug fix #73: If date is in the future (clock skew, timezone), show nothing
+    if (diffMs < 0) return null
+    
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+    
+    if (diffMins < 1) return 'agora'
+    if (diffMins < 60) return `${diffMins}m`
+    if (diffHours < 24) return `${diffHours}h`
+    if (diffDays < 7) return `${diffDays}d`
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}sem` // UX #266: Show weeks for 1-4 week old leads
+    return null // Don't show if older than a month
+  } catch {
+    return null // Silently fail for malformed dates
+  }
 }
 
 const getTagColor = (tag: string) => {
@@ -1164,8 +1174,27 @@ function DashboardContent() {
     return matchesSearch && matchesDate && matchesTag && matchesUnread
   }), [leads, debouncedSearch, tagFilter, dateFilter, showUnreadOnly])
 
+  // UX #265: Sort leads by last activity (most recent first) + unread on top
   const getLeadsByStatus = (status: LeadStatus) => 
-    filteredLeads.filter(lead => lead.status === status)
+    filteredLeads
+      .filter(lead => lead.status === status)
+      .sort((a, b) => {
+        // Priority 1: Unread messages on top
+        const aUnread = hasUnreadMessages(a) ? 1 : 0
+        const bUnread = hasUnreadMessages(b) ? 1 : 0
+        if (bUnread !== aUnread) return bUnread - aUnread
+        
+        // Priority 2: Has reminder today
+        const now = new Date()
+        const aHasReminderToday = a.reminderDate && new Date(a.reminderDate).toDateString() === now.toDateString() ? 1 : 0
+        const bHasReminderToday = b.reminderDate && new Date(b.reminderDate).toDateString() === now.toDateString() ? 1 : 0
+        if (bHasReminderToday !== aHasReminderToday) return bHasReminderToday - aHasReminderToday
+        
+        // Priority 3: Most recently created (proxy for last activity)
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return bTime - aTime // Descending (newest first)
+      })
 
   // UX #157: Arrow key navigation between leads (must be after filteredLeads is defined)
   useEffect(() => {
@@ -1272,6 +1301,15 @@ function DashboardContent() {
       return createdAt < threeDaysAgo
     }).slice(0, 5) // Show max 5
   }, [leads])
+  
+  // UX #267: Helper to check if a specific lead is cooling
+  const isLeadCooling = (lead: Lead): boolean => {
+    if (!['novo', 'em_contato'].includes(lead.status)) return false
+    if (lead.reminderDate) return false
+    const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000
+    const createdAt = lead.createdAt ? new Date(lead.createdAt).getTime() : Date.now()
+    return createdAt < threeDaysAgo
+  }
   
   // Add reminder to lead
   const addReminder = (leadId: string, date: string, note: string) => {
@@ -1477,6 +1515,29 @@ function DashboardContent() {
                   </span>
                 </div>
               )}
+              {/* UX #268: Quick sync button */}
+              {isConnected && !isSyncing && (
+                <Button 
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 hover:bg-green-50 hover:text-green-600"
+                  onClick={syncMessages}
+                  title="Sincronizar mensagens"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" />
+                </Button>
+              )}
+              {isSyncing && (
+                <Button 
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0 cursor-not-allowed"
+                  disabled
+                >
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-green-500" />
+                </Button>
+              )}
+              
               <Link href="/connect">
                 <Button 
                   variant={isConnected ? 'outline' : 'default'}
@@ -1952,6 +2013,7 @@ function DashboardContent() {
                       <div className="space-y-1">
                         {statusLeads.map((lead) => {
                           const hasUnread = hasUnreadMessages(lead)
+                          const isCooling = isLeadCooling(lead) // UX #267: Check if lead needs attention
                           return (
                             <Card 
                               key={lead.id}
@@ -1961,7 +2023,9 @@ function DashboardContent() {
                                   ? 'ring-2 ring-green-500 shadow-md' 
                                   : hasUnread 
                                     ? 'bg-green-50 border-green-300 shadow-sm' 
-                                    : ''
+                                    : isCooling
+                                      ? 'border-amber-300 bg-amber-50/30 lead-cooling' // UX #267: Visual indicator for cooling leads
+                                      : ''
                               } ${draggedLead === lead.id ? 'dragging-card' : ''} ${recentlyMovedLead === lead.id ? 'lead-just-moved' : ''}`}
                               draggable
                               role="button"
@@ -2028,6 +2092,16 @@ function DashboardContent() {
                                       }
                                       return null
                                     })()}
+                                    {/* UX #267: Cooling lead indicator */}
+                                    {isCooling && !hasUnread && (
+                                      <span 
+                                        className="text-[7px] px-1 py-0.5 bg-amber-400 text-amber-900 rounded-full font-medium flex items-center gap-0.5"
+                                        title="Sem contato há mais de 3 dias - considere fazer follow-up"
+                                      >
+                                        <Clock className="w-2 h-2" />
+                                        {!settings.compactView && '3d+'}
+                                      </span>
+                                    )}
                                     {/* UX #85: Enhanced reminder indicator with urgency levels */}
                                     {lead.reminderDate && (() => {
                                       const reminderTime = new Date(lead.reminderDate).getTime()
