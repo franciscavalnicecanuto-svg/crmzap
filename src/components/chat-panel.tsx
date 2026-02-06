@@ -87,8 +87,9 @@ const renderTextWithLinks = (text: string, fromMe: boolean) => {
 // Bug fix #32: Only treat known media markers as media (not arbitrary text starting with [)
 // Bug fix #45: Added English variants (location, image, document, etc.) for Evolution API compatibility
 // Bug fix #47: Added viewOnce variants for disappearing media messages
+// Bug fix #501: Added more sticker variants, webp, poll, and reaction markers
 const renderMessageContent = (text: string, fromMe: boolean) => {
-  const mediaPatterns = /^\[(mídia|media|imagem|image|foto|photo|vídeo|video|áudio|audio|ptt|voice|documento|document|arquivo|file|sticker|figurinha|gif|localização|location|contato|contact|viewonce|view once|visualização única)\]$/i
+  const mediaPatterns = /^\[(mídia|media|imagem|image|foto|photo|vídeo|video|áudio|audio|ptt|voice|documento|document|arquivo|file|sticker|figurinha|sticker:\s*.+|adesivo|gif|webp|localização|location|contato|contact|vcard|viewonce|view once|visualização única|enquete|poll|reação|reaction)\]$/i
   const isMedia = mediaPatterns.test(text)
   
   if (isMedia) {
@@ -136,11 +137,38 @@ const renderMessageContent = (text: string, fromMe: boolean) => {
         </span>
       )
     }
-    if (lowerText.includes('contato') || lowerText.includes('contact')) {
+    if (lowerText.includes('contato') || lowerText.includes('contact') || lowerText.includes('vcard')) {
       return (
         <span className="flex items-center gap-1 italic opacity-80">
           <FileText className={iconClass} />
           <span>Contato</span>
+        </span>
+      )
+    }
+    // Bug fix #501: Handle sticker with name variant [sticker: name]
+    if (lowerText.includes('sticker') || lowerText.includes('figurinha') || lowerText.includes('adesivo') || lowerText.includes('webp')) {
+      return (
+        <span className="flex items-center gap-1 italic opacity-80">
+          <span className="text-base">😊</span>
+          <span>Figurinha</span>
+        </span>
+      )
+    }
+    // UX #502: Handle poll/enquete
+    if (lowerText.includes('enquete') || lowerText.includes('poll')) {
+      return (
+        <span className="flex items-center gap-1 italic opacity-80">
+          <span className="text-base">📊</span>
+          <span>Enquete</span>
+        </span>
+      )
+    }
+    // UX #503: Handle reaction
+    if (lowerText.includes('reação') || lowerText.includes('reaction')) {
+      return (
+        <span className="flex items-center gap-1 italic opacity-80">
+          <span className="text-base">👍</span>
+          <span>Reação</span>
         </span>
       )
     }
@@ -690,6 +718,21 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
       if ('vibrate' in navigator) navigator.vibrate([30, 50, 30])
       setSendError('Mensagem vazia ou contém apenas espaços')
       setTimeout(() => setSendError(null), 3000)
+      return
+    }
+    
+    // Bug fix #505: Warn about offline mode but allow sending (will queue)
+    if (!isConnected) {
+      console.warn('Sending message while disconnected - will attempt anyway')
+    }
+    
+    // Bug fix #506: Validate message length before sending (WhatsApp limit ~65536 chars)
+    if (cleanedMessage.length > 65000) {
+      setInputShake(true)
+      setTimeout(() => setInputShake(false), 500)
+      if ('vibrate' in navigator) navigator.vibrate([50, 100, 50])
+      setSendError(`Mensagem muito longa (${cleanedMessage.length}/65000 caracteres)`)
+      setTimeout(() => setSendError(null), 5000)
       return
     }
     

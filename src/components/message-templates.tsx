@@ -65,6 +65,7 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
   const [newContent, setNewContent] = useState('')
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null) // Bug fix #56: Confirm before delete
+  const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null) // UX #504: Preview before send
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -89,7 +90,9 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (deleteConfirm) {
+        if (previewTemplate) {
+          setPreviewTemplate(null)
+        } else if (deleteConfirm) {
           setDeleteConfirm(null)
         } else if (isEditing || editingTemplate) {
           setIsEditing(false)
@@ -100,10 +103,16 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
           onClose()
         }
       }
+      // UX #504: Enter to confirm preview and send
+      if (e.key === 'Enter' && previewTemplate && !e.shiftKey) {
+        e.preventDefault()
+        onSelect(previewTemplate.content)
+        onClose()
+      }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose, isEditing, editingTemplate, deleteConfirm])
+  }, [onClose, isEditing, editingTemplate, deleteConfirm, previewTemplate, onSelect])
 
   const saveTemplates = (newTemplates: Template[]) => {
     setTemplates(newTemplates)
@@ -258,6 +267,51 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
           />
         </div>
 
+        {/* UX #504: Preview Panel */}
+        {previewTemplate && (
+          <div className="p-3 bg-gradient-to-r from-green-50 to-emerald-50 border-b animate-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-green-700 flex items-center gap-1">
+                <Zap className="w-3 h-3" />
+                Preview: {previewTemplate.name}
+              </span>
+              <button 
+                onClick={() => setPreviewTemplate(null)}
+                className="text-green-600 hover:text-green-800 p-1"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-sm border border-green-200 shadow-sm max-h-24 overflow-y-auto">
+              {previewTemplate.content}
+            </div>
+            <div className="flex gap-2 mt-2">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 h-8 text-xs"
+                onClick={() => setPreviewTemplate(null)}
+              >
+                Voltar
+              </Button>
+              <Button
+                size="sm"
+                className="flex-1 h-8 text-xs bg-[#25D366] hover:bg-[#20bd5a] text-black"
+                onClick={() => {
+                  onSelect(previewTemplate.content)
+                  onClose()
+                }}
+              >
+                <Check className="w-3 h-3 mr-1" />
+                Usar Template
+              </Button>
+            </div>
+            <p className="text-[10px] text-green-600 mt-2 text-center">
+              Pressione Enter para usar ou Esc para voltar
+            </p>
+          </div>
+        )}
+
         {/* Templates List */}
         <div className="overflow-y-auto max-h-[50vh] p-2">
           {filteredTemplates.map(template => (
@@ -266,9 +320,21 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
               className={`p-3 rounded-lg cursor-pointer group transition-all mb-1 ${
                 deleteConfirm === template.id 
                   ? 'bg-red-50 border border-red-200' 
-                  : 'hover:bg-muted/50'
+                  : previewTemplate?.id === template.id
+                    ? 'bg-green-50 border border-green-300 ring-1 ring-green-400'
+                    : 'hover:bg-muted/50'
               }`}
-              onClick={() => deleteConfirm !== template.id && handleSelect(template)}
+              onClick={() => {
+                if (deleteConfirm !== template.id) {
+                  // UX #504: Single click shows preview, double click sends immediately
+                  if (previewTemplate?.id === template.id) {
+                    handleSelect(template)
+                  } else {
+                    setPreviewTemplate(template)
+                  }
+                }
+              }}
+              onDoubleClick={() => deleteConfirm !== template.id && handleSelect(template)}
             >
               {/* Bug fix #56: Delete confirmation inline */}
               {deleteConfirm === template.id ? (
