@@ -427,3 +427,79 @@
 3. 💡 Preview de mídia inline usando novos componentes
 4. 💡 Modo offline com queue
 5. 💡 Exportar conversas em PDF
+
+---
+
+## Session Update: 10:15 AM
+
+### Melhorias Implementadas
+
+#### 21. ✅ UX #320 - Indicador de Última Sincronização Aprimorado (dashboard/page.tsx)
+- Tempo relativo ao lado do botão de sync (ex: "5m", "2h", "1d")
+- Animação pulsante "sync-stale" quando sync tem mais de 30 minutos
+- Tooltip com hora exata da última sincronização
+- Persiste no localStorage entre sessões
+- Cores âmbar para indicar sync desatualizado
+
+#### 22. ✅ UX #320 - Atalho de Teclado VIP (dashboard/page.tsx)
+- Tecla 'v' para marcar/desmarcar lead selecionado como VIP
+- Toast de feedback: "⭐ Marcado como VIP" ou "VIP removido"
+- Funciona com lead selecionado via navegação por teclado
+
+#### 23. ✅ UX #321 - Atalho de Teclado Urgente (dashboard/page.tsx)
+- Tecla 'u' para marcar/desmarcar lead selecionado como Urgente
+- Toast de feedback: "🔥 Marcado como Urgente" ou "Urgente removido"
+- Complementa o atalho 'v' para marcação rápida
+
+#### 24. ✅ UX #322 - Contador de Caracteres para Notas de Lembrete (dashboard/page.tsx)
+- Limite de 200 caracteres para notas de lembrete
+- Contador aparece após 50 caracteres
+- Cores progressivas: normal → âmbar (>120) → vermelho (>180)
+- Formato "X/200" para clareza
+- Previne notas excessivamente longas
+
+#### 25. ✅ CSS - Novas Animações de UX (globals.css)
+- `new-lead-highlight`: Destaque animado para leads recém-adicionados
+- `sync-stale`: Pulso para indicar sync desatualizado
+- `vip-badge-glow`: Brilho para badges VIP
+- `days-badge-warning/danger`: Cores para tempo na coluna
+
+### Arquivos Modificados
+1. `src/app/dashboard/page.tsx` (+45 linhas)
+2. `src/app/globals.css` (+55 linhas)
+
+### Commit
+- `9854351` - feat(ux): add last sync indicator, VIP/Urgent shortcuts, and note character limit
+
+### Deploy
+- **URL**: https://whatszap-zeta.vercel.app
+- **Status**: ✅ Produção
+
+---
+
+## Resumo Total da Sessão (10:15 AM)
+
+### Melhorias Implementadas: 25
+1-20. (sessões anteriores)
+21. ✅ Indicador de última sincronização aprimorado
+22. ✅ Atalho 'v' para VIP
+23. ✅ Atalho 'u' para Urgente
+24. ✅ Contador de caracteres para notas de lembrete
+25. ✅ 4 novas animações CSS
+
+### Commits Totais: 9
+
+### Métricas Finais
+- **Linhas adicionadas**: ~1000+
+- **Componentes novos**: 4
+- **Animações CSS novas**: 27+
+- **Bugs corrigidos**: 4
+- **UX improvements**: 21+
+- **Atalhos de teclado novos**: 4 (v, u, t, r)
+
+### Próximas Prioridades
+1. 🎯 Swipe para mudar status (mobile)
+2. 🎯 Integrar typing indicator com Evolution API
+3. 💡 Preview de mídia inline
+4. 💡 Modo offline com queue
+5. 💡 Indicador de dias na coluna (parcialmente implementado no CSS)
