@@ -1771,48 +1771,7 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* UX #189: Enhanced Sync Progress Bar with shimmer */}
-        {isSyncing && (
-          <div className={`border-b px-3 py-2 animate-in slide-in-from-top-1 duration-200 transition-colors ${
-            syncProgress >= 100 
-              ? 'bg-green-100 border-green-300 sync-complete' 
-              : 'bg-green-50 border-green-200 sync-shimmer'
-          }`}>
-            <div className="flex items-center gap-2 text-xs text-green-700 mb-1">
-              {syncProgress >= 100 ? (
-                <Check className="w-3 h-3 text-green-600" />
-              ) : (
-                <Loader2 className="w-3 h-3 animate-spin" />
-              )}
-              <span className="font-medium">
-                {syncProgress < 20 ? '📡 Conectando ao servidor...' : 
-                 syncProgress < 50 ? '📥 Buscando mensagens...' :
-                 syncProgress < 80 ? '💾 Salvando mensagens...' :
-                 syncProgress < 95 ? '🔄 Processando...' : 
-                 syncProgress >= 100 ? '✅ Sincronização completa!' : '⏳ Finalizando...'}
-              </span>
-              <span className={`ml-auto font-bold count-animated transition-colors ${
-                syncProgress >= 100 ? 'text-green-600' : ''
-              }`}>
-                {Math.round(syncProgress)}%
-              </span>
-            </div>
-            <div className="w-full h-2 bg-green-200/60 rounded-full overflow-hidden backdrop-blur-sm">
-              <div 
-                className={`h-full rounded-full transition-all ease-out relative ${
-                  syncProgress >= 100 
-                    ? 'bg-green-500 duration-500' 
-                    : 'bg-gradient-to-r from-green-500 via-green-400 to-green-500 duration-300'
-                }`}
-                style={{ width: `${Math.min(syncProgress, 100)}%` }}
-              >
-                {syncProgress < 100 && (
-                  <div className="absolute inset-0 bg-white/20 animate-pulse" />
-                )}
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Bug fix #288: Removed duplicate sync progress bar (UX #189) - UX #510 floating bar provides better experience */}
 
         {/* Pending Reminders Alert */}
         {pendingReminders.length > 0 && (

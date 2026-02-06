@@ -320,24 +320,64 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   // Bug fix #92: Keyboard shortcuts for quick replies (Alt+1 through Alt+7)
   // UX #123: Added Ctrl+R to refresh messages, Ctrl+Shift+A to analyze
   // UX #134: Added Escape to blur input when focused
+  // Bug fix #287: Quick replies now match the contextual UI based on lead status
   useEffect(() => {
     if (!lead || !isConnected) return
     
-    const quickReplies = [
-      'Olá! Tudo bem?',
-      'Um momento, por favor',
-      'Perfeito!',
-      'Posso te ligar?',
-      'Podemos agendar?',
-      'Vou verificar os valores',
-      'Obrigado pelo contato!',
-    ]
+    // Bug fix #287: Use same status-based replies as the UI (must match statusReplies below)
+    const getQuickRepliesByStatus = (status: string) => {
+      const baseReplies = [
+        'Olá! Tudo bem?',
+        'Um momento, por favor',
+        'Perfeito!',
+      ]
+      
+      const statusReplies: Record<string, string[]> = {
+        novo: [
+          ...baseReplies,
+          'Como posso te ajudar?',
+          'Posso te ligar para explicar melhor?',
+          'Quer que eu te envie mais informações?',
+          'Obrigado pelo contato!',
+        ],
+        em_contato: [
+          ...baseReplies,
+          'Podemos agendar uma conversa?',
+          'Ficou alguma dúvida?',
+          'Vou te enviar uma proposta',
+          'Estou aguardando seu retorno',
+        ],
+        negociando: [
+          ...baseReplies,
+          'Vou verificar os valores pra você',
+          'Podemos fechar negócio?',
+          'Preparei condições especiais',
+          'Essa condição é válida até amanhã',
+        ],
+        fechado: [
+          'Parabéns pela sua compra!',
+          'Vou enviar os dados de acesso',
+          'Precisa de ajuda com algo?',
+          'Que tal deixar uma avaliação?',
+          'Obrigado pela preferência!',
+        ],
+        perdido: [
+          'Olá! Tudo bem com você?',
+          'Temos novidades que podem te interessar',
+          'Preparei uma condição especial',
+          'Posso te ajudar com algo?',
+        ],
+      }
+      
+      return statusReplies[status] || statusReplies.novo
+    }
     
     const handleKeyboardShortcuts = (e: KeyboardEvent) => {
-      // Alt+1-7 for quick replies
+      // Alt+1-7 for quick replies (contextual based on lead status)
       if (e.altKey && e.key >= '1' && e.key <= '7') {
         e.preventDefault()
         const idx = parseInt(e.key) - 1
+        const quickReplies = getQuickRepliesByStatus(lead.status || 'novo')
         if (quickReplies[idx]) {
           setNewMessage(quickReplies[idx])
           // Haptic feedback
