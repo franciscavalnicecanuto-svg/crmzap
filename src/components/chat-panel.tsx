@@ -144,12 +144,14 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [isFirstLoad, setIsFirstLoad] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null) // Bug fix #11: Mostrar erro de fetch
+  const [retryCount, setRetryCount] = useState(0) // Bug fix #107: Track retry attempts
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<Message[]>([]) // Bug fix #14: Track messages for comparison
   const isSendingRef = useRef(false) // Bug fix #15: Prevent double sends
   const analysisAbortRef = useRef<AbortController | null>(null) // Bug fix #26: Abort analysis on unmount
   const analysisLeadIdRef = useRef<string | null>(null) // Bug fix #25: Track which lead analysis is for
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null) // Bug fix #107: Retry timeout reference
 
   // Scroll to bottom using scrollIntoView - UX #106: Improved reliability on mobile
   const scrollToBottom = (smooth = false) => {
@@ -216,6 +218,11 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
     return () => {
       abortControllerRef.current?.abort()
       analysisAbortRef.current?.abort() // Bug fix #26: Cancel analysis on unmount/lead change
+      // Bug fix #107: Clear retry timeout on cleanup
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = null
+      }
     }
   }, [lead?.phone, isConnected])
   
@@ -269,14 +276,26 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
     return () => window.removeEventListener('keydown', handleQuickReplyShortcut)
   }, [lead?.phone, isConnected])
 
-  const fetchMessages = async (showLoading: boolean) => {
+  const fetchMessages = async (showLoading: boolean, isRetry: boolean = false) => {
     if (!lead) return
+    
+    // Clear any pending retry timeout
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current)
+      retryTimeoutRef.current = null
+    }
     
     if (showLoading) {
       setIsLoading(true)
       // Bug fix #30: Clear error immediately when starting fresh fetch
       setFetchError(null)
     }
+    
+    // Bug fix #107: Reset retry count on explicit (non-auto) refresh
+    if (!isRetry) {
+      setRetryCount(0)
+    }
+    
     try {
       // Usa API de polling direto da Evolution (não depende de webhook)
       // Bug fix #21: Pass AbortController signal to cancel pending requests
@@ -300,11 +319,13 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
         }
         // Bug fix #20: Clear error on successful main API fetch
         setFetchError(null)
+        setRetryCount(0) // Reset retry count on success
       }
     } catch (err: any) {
       // Bug fix #21: Ignore abort errors (intentional cancellation)
       if (err?.name === 'AbortError') return
       console.error('Failed to fetch messages:', err)
+      
       // Fallback: tentar API antiga
       try {
         const fallbackRes = await fetch('/api/whatsapp/history', {
@@ -317,18 +338,42 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
         if (fallbackData.success) {
           setMessages(fallbackData.messages || [])
           setFetchError(null)
+          setRetryCount(0)
         } else {
-          setFetchError('Não foi possível carregar mensagens')
+          // Bug fix #107: Auto-retry with exponential backoff (max 3 retries)
+          handleFetchError('Não foi possível carregar mensagens')
         }
       } catch (fallbackErr: any) {
         // Bug fix #21: Ignore abort errors (intentional cancellation)
         if (fallbackErr?.name === 'AbortError') return
         console.error('Fallback also failed:', fallbackErr)
-        // Bug fix #11: Mostrar erro para o usuário
-        setFetchError('Erro ao carregar mensagens. Verifique a conexão.')
+        // Bug fix #107: Auto-retry with exponential backoff
+        handleFetchError('Erro ao carregar mensagens. Verifique a conexão.')
       }
     } finally {
       setIsLoading(false)
+    }
+  }
+  
+  // Bug fix #107: Handle fetch errors with auto-retry
+  const handleFetchError = (errorMessage: string) => {
+    const maxRetries = 3
+    
+    if (retryCount < maxRetries) {
+      // Calculate backoff delay: 2s, 4s, 8s
+      const backoffDelay = Math.pow(2, retryCount + 1) * 1000
+      
+      setRetryCount(prev => prev + 1)
+      setFetchError(`${errorMessage} Tentando novamente em ${backoffDelay / 1000}s... (${retryCount + 1}/${maxRetries})`)
+      
+      // Schedule retry
+      retryTimeoutRef.current = setTimeout(() => {
+        fetchMessages(false, true)
+      }, backoffDelay)
+    } else {
+      // Max retries reached
+      setFetchError(`${errorMessage} (${maxRetries} tentativas falharam)`)
+      setRetryCount(0)
     }
   }
 
