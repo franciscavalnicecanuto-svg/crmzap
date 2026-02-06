@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { X, Send, Loader2, Sparkles, RefreshCw, Maximize2, Minimize2, Image, FileText, Video, Mic, History, ChevronDown, ArrowLeft, Tag, Bell, MoreVertical, AlertCircle } from 'lucide-react'
+import { X, Send, Loader2, Sparkles, RefreshCw, Maximize2, Minimize2, Image, FileText, Video, Mic, History, ChevronDown, ArrowLeft, Tag, Bell, MoreVertical, AlertCircle, MessageCircle } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -624,25 +624,32 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   // UX #77: Group messages by date
   // Bug fix #93: Handle messages without timestamp by grouping with previous message's date
   // Bug fix #96: Don't create new group for consecutive messages without timestamps
+  // Bug fix #111: Improved logic to handle edge cases with null timestamps at start of conversation
   const getMessagesByDate = (messages: Message[]) => {
+    if (messages.length === 0) return []
+    
     const groups: { date: string; messages: Message[] }[] = []
     let currentDate = ''
     let lastValidTimestamp = ''
     
+    // First pass: find any valid timestamp to use as fallback for leading null timestamps
+    const firstValidTimestamp = messages.find(m => m.timestamp)?.timestamp || new Date().toISOString()
+    
     for (const msg of messages) {
       // Use last valid timestamp if current message has none
-      const effectiveTimestamp = msg.timestamp || lastValidTimestamp
+      // If we haven't seen any valid timestamp yet, use the first valid one we found (or now)
+      const effectiveTimestamp = msg.timestamp || lastValidTimestamp || firstValidTimestamp
       if (msg.timestamp) {
         lastValidTimestamp = msg.timestamp
       }
       
-      const msgDate = effectiveTimestamp ? new Date(effectiveTimestamp).toDateString() : ''
+      const msgDate = new Date(effectiveTimestamp).toDateString()
       
       // Create new group only if:
       // 1. First message (no groups yet)
-      // 2. Date is non-empty AND different from current group
-      // This prevents creating multiple groups for consecutive messages without timestamps
-      if (groups.length === 0 || (msgDate !== '' && msgDate !== currentDate)) {
+      // 2. Date is different from current group
+      // Bug fix #111: Always have a valid date now, so comparison is simpler
+      if (groups.length === 0 || msgDate !== currentDate) {
         currentDate = msgDate
         groups.push({ date: effectiveTimestamp, messages: [msg] })
       } else {
@@ -656,10 +663,34 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   // Check if analysis should be available (not in final stages)
   const canAnalyze = lead && !['fechado', 'perdido'].includes(lead.status || '')
 
+  // UX #110: Improved empty state with helpful tips when no lead is selected
   if (!lead) {
     return (
-      <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
-        Selecione um lead para ver a conversa
+      <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-gradient-to-b from-transparent to-green-50/20">
+        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-4 animate-pulse">
+          <MessageCircle className="w-10 h-10 text-green-500" />
+        </div>
+        <h3 className="font-semibold text-base mb-2">Selecione uma conversa</h3>
+        <p className="text-muted-foreground text-sm mb-6 max-w-[220px]">
+          Clique em um lead no kanban para ver a conversa e enviar mensagens
+        </p>
+        <div className="space-y-2 text-xs text-muted-foreground max-w-[200px]">
+          <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
+            <span className="text-lg">💡</span>
+            <span>Arraste cards para mudar o status do lead</span>
+          </div>
+          <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
+            <span className="text-lg">🔔</span>
+            <span>Crie lembretes para não esquecer follow-ups</span>
+          </div>
+          <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
+            <span className="text-lg">🤖</span>
+            <span>Use a IA para analisar conversas</span>
+          </div>
+        </div>
+        <p className="mt-6 text-[10px] text-muted-foreground/50">
+          Atalho: Ctrl+K para buscar leads
+        </p>
       </div>
     )
   }

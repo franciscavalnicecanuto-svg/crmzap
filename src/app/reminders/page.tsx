@@ -160,9 +160,12 @@ export default function RemindersPage() {
   const formatReminderDate = (dateStr: string) => {
     const date = new Date(dateStr)
     // Bug fix #16: Distinguish between "today but passed" vs "today upcoming"
+    // Bug fix #112: Show more detail for reminders that passed more than 1 day ago
     const isTodayPassed = date >= today && date < now
     const isTodayUpcoming = date >= now && date < tomorrow
     const isTomorrow = date >= tomorrow && date < new Date(tomorrow.getTime() + 24 * 60 * 60 * 1000)
+    const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
+    const isYesterday = date >= yesterday && date < today
     
     if (isTodayPassed) {
       return `Hoje às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (passou)`
@@ -173,11 +176,20 @@ export default function RemindersPage() {
     if (isTomorrow) {
       return `Amanhã às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
     }
-    // Bug fix #16: Also show "(passou)" for past dates
+    // Bug fix #112: Show "Ontem" for yesterday's reminders
+    if (isYesterday) {
+      return `Ontem às ${date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })} (atrasado)`
+    }
+    // Bug fix #16 & #112: Show how many days ago for older reminders
     if (date < now) {
-      return `${date.toLocaleString('pt-BR', { 
+      const daysAgo = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+      const dateFormatted = date.toLocaleString('pt-BR', { 
         day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
-      })} (passou)`
+      })
+      if (daysAgo >= 7) {
+        return `${dateFormatted} (${Math.floor(daysAgo / 7)} semana${daysAgo >= 14 ? 's' : ''} atrás)`
+      }
+      return `${dateFormatted} (${daysAgo} dia${daysAgo > 1 ? 's' : ''} atrás)`
     }
     return date.toLocaleString('pt-BR', { 
       day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
