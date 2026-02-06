@@ -201,3 +201,90 @@
 ---
 
 *Última atualização: 2026-02-06 14:15*
+
+---
+
+## 🔧 Sessão 3: 2026-02-06 14:30
+
+### 🛠️ Bug Fixes
+
+#### Bug #650: Edição de template perdida sem aviso
+**Arquivo:** `src/components/message-templates.tsx`
+**Problema:** Se usuário fecha modal enquanto edita template, perde tudo sem aviso
+**Solução:** 
+- Adicionado `showDiscardWarning` state
+- Modal de confirmação ao tentar fechar com edições não salvas
+- Escape e backdrop click verificam se há edições pendentes
+**Commit:** `a3cec5c`
+
+#### Bug #653: Sugestões IA obsoletas durante cooldown
+**Arquivo:** `src/components/ai-suggestions.tsx`
+**Problema:** Quando rate limit é atingido, sugestões antigas continuam visíveis
+**Solução:** `setSuggestions([])` ao iniciar cooldown
+**Commit:** `eaaddea`
+
+#### Bug #800: Hydration mismatch com window.innerWidth
+**Arquivo:** `src/components/connection-status.tsx`
+**Problema:** Uso de `window.innerWidth` causava mismatch entre server e client
+**Solução:** Removido check de largura de tela que dependia de window
+**Commit:** `1531f5a`
+
+---
+
+### 🎨 UX Melhorias
+
+#### UX #651: Dica de double-click nos templates
+**Arquivo:** `src/components/message-templates.tsx`
+**Descrição:** Texto "Clique para preview • Duplo clique para usar direto" no footer
+**Commit:** `a3cec5c`
+
+#### UX #652: Atalho Ctrl+T para templates
+**Arquivo:** `src/components/chat-panel.tsx`
+**Descrição:**
+- Ctrl+T / Cmd+T abre o template picker
+- Haptic feedback ao abrir
+- Estado controlado do picker
+**Commit:** `593490c`
+
+#### UX #654: Estatísticas de uso dos templates
+**Arquivo:** `src/components/message-templates.tsx`
+**Descrição:**
+- Contador de uso por template (ex: "5x")
+- Templates ordenados por uso (mais usados primeiro)
+- Persistência no localStorage
+**Commit:** `a3cec5c`
+
+#### UX #804: Estado de loading no EmptyState
+**Arquivo:** `src/components/empty-state.tsx`
+**Descrição:**
+- Novo tipo 'loading' para EmptyState
+- Ícone Loader2 com animação de spin
+- Gradiente e dicas específicas para loading
+**Commit:** `d98a9e7`
+
+---
+
+## 📊 Resumo Sessão 3
+
+| Categoria | Quantidade |
+|-----------|------------|
+| Bugs Corrigidos | 3 |
+| Melhorias UX | 4 |
+| Commits | 5 |
+
+---
+
+## 🚀 Deploy
+
+**Status:** ✅ Deploy concluído
+**URL:** https://whatszap-zeta.vercel.app
+**Commits desta sessão:**
+- `a3cec5c` - Templates: usage stats, discard warning, hint
+- `593490c` - Chat: Ctrl+T shortcut
+- `eaaddea` - AI Suggestions: clear on rate limit
+- `1531f5a` - Connection: fix hydration mismatch
+- `d98a9e7` - EmptyState: loading state
+
+---
+
+*Última atualização: 2026-02-06 14:50*
