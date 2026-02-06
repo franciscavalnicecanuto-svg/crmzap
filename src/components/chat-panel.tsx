@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { X, Send, Loader2, Sparkles, RefreshCw, Maximize2, Minimize2, Image, FileText, Video, Mic, History, ChevronDown, ArrowLeft, Tag, Bell, MoreVertical, AlertCircle, MessageCircle, Copy, Check, Share2 } from 'lucide-react'
+import { X, Send, Loader2, Sparkles, RefreshCw, Maximize2, Minimize2, Image, FileText, Video, Mic, History, ChevronDown, ArrowLeft, Tag, Bell, MoreVertical, AlertCircle, MessageCircle, Copy, Check, Share2, MoreHorizontal } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -147,6 +147,8 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   const [fetchError, setFetchError] = useState<string | null>(null) // Bug fix #11: Mostrar erro de fetch
   const [retryCount, setRetryCount] = useState(0) // Bug fix #107: Track retry attempts
   const [analysisCopied, setAnalysisCopied] = useState(false) // UX #141: Copy analysis button state
+  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null) // UX #200: Copy individual message
+  const [contextMenuMessageId, setContextMenuMessageId] = useState<string | null>(null) // UX #201: Message context menu
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<Message[]>([]) // Bug fix #14: Track messages for comparison
@@ -154,6 +156,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   const analysisAbortRef = useRef<AbortController | null>(null) // Bug fix #26: Abort analysis on unmount
   const analysisLeadIdRef = useRef<string | null>(null) // Bug fix #25: Track which lead analysis is for
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null) // Bug fix #107: Retry timeout reference
+  const textareaRef = useRef<HTMLTextAreaElement>(null) // UX #210: Focus textarea when lead changes
 
   // Scroll to bottom using scrollIntoView - UX #106: Improved reliability on mobile
   const scrollToBottom = (smooth = false) => {
@@ -270,6 +273,13 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   useEffect(() => {
     setIsFirstLoad(true)
     setShowScrollButton(false)
+    
+    // UX #210: Focus textarea when lead changes (desktop only, with delay for animation)
+    if (lead && window.innerWidth >= 768) {
+      setTimeout(() => {
+        textareaRef.current?.focus()
+      }, 300)
+    }
   }, [lead?.phone])
 
   // Bug fix #92: Keyboard shortcuts for quick replies (Alt+1 through Alt+7)
@@ -664,6 +674,55 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
     }
   }
 
+  // UX #200: Copy individual message with visual feedback
+  const copyMessage = useCallback((messageId: string, text: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedMessageId(messageId)
+    setContextMenuMessageId(null)
+    if ('vibrate' in navigator) navigator.vibrate(10)
+    setTimeout(() => setCopiedMessageId(null), 2000)
+  }, [])
+  
+  // UX #201: Handle long press for mobile context menu
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const handleMessageTouchStart = useCallback((messageId: string) => {
+    longPressTimerRef.current = setTimeout(() => {
+      setContextMenuMessageId(messageId)
+      if ('vibrate' in navigator) navigator.vibrate(20)
+    }, 500)
+  }, [])
+  
+  const handleMessageTouchEnd = useCallback(() => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }, [])
+  
+  // UX #202: Close context menu when clicking outside
+  useEffect(() => {
+    if (!contextMenuMessageId) return
+    
+    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('[data-context-menu]')) {
+        setContextMenuMessageId(null)
+      }
+    }
+    
+    // Small delay to avoid immediate close on the same touch event
+    const timer = setTimeout(() => {
+      document.addEventListener('click', handleClickOutside)
+      document.addEventListener('touchstart', handleClickOutside)
+    }, 100)
+    
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('click', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+    }
+  }, [contextMenuMessageId])
+
   // UX #158: Enhanced time formatting with relative time for recent messages
   const formatTime = (timestamp: string | null) => {
     if (!timestamp) return ''
@@ -818,27 +877,31 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
           <div>
             <h3 className="font-medium text-sm">{lead.name}</h3>
             {/* UX #155: Phone with copy button */}
+            {/* UX #212: Enhanced phone copy with visual feedback */}
             <p className="text-xs text-muted-foreground flex items-center gap-1 group">
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(lead.phone.replace(/\D/g, ''))
-                  // Show feedback
+                  // Visual feedback via state
                   const btn = document.activeElement as HTMLButtonElement
                   if (btn) {
-                    const originalTitle = btn.title
-                    btn.title = 'Copiado!'
-                    setTimeout(() => { btn.title = originalTitle }, 1500)
+                    btn.classList.add('text-green-600')
+                    btn.textContent = '✓ Copiado!'
+                    setTimeout(() => { 
+                      btn.classList.remove('text-green-600')
+                      btn.textContent = lead.phone 
+                    }, 1500)
                   }
                   // Haptic
-                  if ('vibrate' in navigator) navigator.vibrate(10)
+                  if ('vibrate' in navigator) navigator.vibrate([10, 50, 10])
                 }}
-                className="hover:text-foreground hover:underline underline-offset-2 transition-colors cursor-pointer"
-                title="Clique para copiar"
+                className="hover:text-foreground hover:underline underline-offset-2 transition-all cursor-pointer active:scale-95"
+                title="Clique para copiar número"
               >
                 {lead.phone}
               </button>
               <Copy 
-                className="h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity cursor-pointer hover:opacity-100"
+                className="h-3 w-3 opacity-30 group-hover:opacity-70 transition-opacity cursor-pointer hover:opacity-100 hover:text-green-600"
                 onClick={(e) => {
                   e.stopPropagation()
                   navigator.clipboard.writeText(lead.phone.replace(/\D/g, ''))
@@ -846,20 +909,42 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
                 }}
               />
               {/* UX #98: Show last message time if available */}
-              {messages.length > 0 && messages[messages.length - 1]?.timestamp && (
-                <span className="text-[10px] opacity-60">
-                  · {(() => {
-                    const lastTs = new Date(messages[messages.length - 1].timestamp!)
-                    const now = new Date()
-                    const diffMins = Math.floor((now.getTime() - lastTs.getTime()) / 60000)
-                    if (diffMins < 1) return 'agora'
-                    if (diffMins < 60) return `${diffMins}m atrás`
-                    const diffHours = Math.floor(diffMins / 60)
-                    if (diffHours < 24) return `${diffHours}h atrás`
-                    return lastTs.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
-                  })()}
-                </span>
-              )}
+              {/* UX #211: Enhanced activity indicator with "recently active" badge */}
+              {messages.length > 0 && (() => {
+                // Find last incoming message (not from me)
+                const lastIncoming = [...messages].reverse().find(m => !m.fromMe)
+                const lastTs = lastIncoming?.timestamp ? new Date(lastIncoming.timestamp) : null
+                const lastMsgTs = messages[messages.length - 1]?.timestamp ? new Date(messages[messages.length - 1].timestamp!) : null
+                
+                if (!lastMsgTs) return null
+                
+                const now = new Date()
+                const diffMins = Math.floor((now.getTime() - lastMsgTs.getTime()) / 60000)
+                const lastIncomingDiffMins = lastTs ? Math.floor((now.getTime() - lastTs.getTime()) / 60000) : Infinity
+                
+                // Check if recently active (incoming message in last 5 minutes)
+                const isRecentlyActive = lastIncomingDiffMins < 5
+                
+                return (
+                  <>
+                    {isRecentlyActive && (
+                      <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-green-100 text-green-700 rounded text-[9px] font-medium animate-pulse">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                        ativo
+                      </span>
+                    )}
+                    <span className="text-[10px] opacity-60">
+                      · {(() => {
+                        if (diffMins < 1) return 'agora'
+                        if (diffMins < 60) return `${diffMins}m atrás`
+                        const diffHours = Math.floor(diffMins / 60)
+                        if (diffHours < 24) return `${diffHours}h atrás`
+                        return lastMsgTs.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                      })()}
+                    </span>
+                  </>
+                )
+              })()}
             </p>
           </div>
         </div>
@@ -1202,14 +1287,36 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
                     <div
                       key={msg.id}
                       data-message-id={msg.id}
-                      className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'} animate-in fade-in-0 slide-in-from-bottom-2 duration-200`}
+                      className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'} animate-in fade-in-0 slide-in-from-bottom-2 duration-200 group/message`}
                     >
+                      {/* UX #200: Copy button on left for outgoing messages */}
+                      {msg.fromMe && (
+                        <button
+                          onClick={() => copyMessage(msg.id, msg.text)}
+                          className={`self-center mr-1 p-1 rounded opacity-0 group-hover/message:opacity-100 focus:opacity-100 transition-opacity ${
+                            copiedMessageId === msg.id 
+                              ? 'text-green-600' 
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                          }`}
+                          title={copiedMessageId === msg.id ? 'Copiado!' : 'Copiar mensagem'}
+                          aria-label="Copiar mensagem"
+                        >
+                          {copiedMessageId === msg.id ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      )}
                       <div
-                        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm transition-colors ${
+                        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm transition-colors relative ${
                           msg.fromMe
                             ? 'bg-green-500 text-white'
                             : 'bg-muted'
-                        }`}
+                        } ${contextMenuMessageId === msg.id ? 'ring-2 ring-green-400 ring-offset-1' : ''}`}
+                        onTouchStart={() => handleMessageTouchStart(msg.id)}
+                        onTouchEnd={handleMessageTouchEnd}
+                        onTouchCancel={handleMessageTouchEnd}
                       >
                         {renderMessageContent(msg.text, msg.fromMe)}
                         <p className={`text-[10px] mt-1 flex items-center gap-1 ${msg.fromMe ? 'text-green-100' : 'text-muted-foreground'}`}>
@@ -1221,7 +1328,47 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
                             </svg>
                           )}
                         </p>
+                        {/* UX #201: Context menu on long press (mobile) */}
+                        {contextMenuMessageId === msg.id && (
+                          <div 
+                            className="absolute -top-10 left-1/2 -translate-x-1/2 bg-background border rounded-lg shadow-lg p-1 flex gap-1 z-10 animate-in fade-in-0 zoom-in-95 duration-150"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={() => copyMessage(msg.id, msg.text)}
+                              className="flex items-center gap-1.5 px-2 py-1.5 text-xs hover:bg-muted rounded transition-colors"
+                            >
+                              <Copy className="h-3 w-3" />
+                              Copiar
+                            </button>
+                            <button
+                              onClick={() => setContextMenuMessageId(null)}
+                              className="flex items-center gap-1.5 px-2 py-1.5 text-xs hover:bg-muted rounded transition-colors text-muted-foreground"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
                       </div>
+                      {/* UX #200: Copy button on right for incoming messages */}
+                      {!msg.fromMe && (
+                        <button
+                          onClick={() => copyMessage(msg.id, msg.text)}
+                          className={`self-center ml-1 p-1 rounded opacity-0 group-hover/message:opacity-100 focus:opacity-100 transition-opacity ${
+                            copiedMessageId === msg.id 
+                              ? 'text-green-600' 
+                              : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                          }`}
+                          title={copiedMessageId === msg.id ? 'Copiado!' : 'Copiar mensagem'}
+                          aria-label="Copiar mensagem"
+                        >
+                          {copiedMessageId === msg.id ? (
+                            <Check className="h-3.5 w-3.5" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1232,18 +1379,22 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
         )}
 
         {/* Scroll to bottom button - UX #142: Shows new message count when scrolled up */}
+        {/* UX #186: Pulsating animation when new messages arrive */}
         {showScrollButton && messages.length > 0 && (
           <Button
             size="icon"
             className={`absolute bottom-4 right-4 h-8 w-8 rounded-full shadow-lg border animate-in fade-in-0 zoom-in-75 duration-200 ${
               newMessageIndicator > 0 
-                ? 'bg-green-500 hover:bg-green-600 border-green-400' 
+                ? 'bg-green-500 hover:bg-green-600 border-green-400 scroll-button-pulse' 
                 : 'bg-white hover:bg-gray-50'
             }`}
             onClick={() => {
               scrollToBottom(true)
               setNewMessageIndicator(0)
+              // Haptic feedback on click
+              if ('vibrate' in navigator) navigator.vibrate(10)
             }}
+            aria-label={newMessageIndicator > 0 ? `${newMessageIndicator} novas mensagens, clique para ver` : 'Ir para o final'}
           >
             {newMessageIndicator > 0 ? (
               <div className="flex items-center justify-center">
@@ -1406,16 +1557,23 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
           </div>
         )}
         {/* UX #84: Sending indicator above input */}
+        {/* UX #213: Enhanced sending indicator with progress feel */}
         {isSending && (
-          <div className="mb-2 flex items-center gap-2 text-xs text-green-600 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            <span>Enviando mensagem...</span>
+          <div className="mb-2 flex items-center gap-2 text-xs animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 border border-green-200 rounded-full">
+              <div className="relative w-4 h-4">
+                <div className="absolute inset-0 rounded-full border-2 border-green-200" />
+                <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-green-500 animate-spin" />
+              </div>
+              <span className="text-green-700 font-medium">Enviando...</span>
+            </div>
           </div>
         )}
         <div className="flex gap-2 items-end">
           <TemplateButton onSelect={(content) => setNewMessage(content)} />
           <div className="flex-1 relative">
             <textarea
+              ref={textareaRef}
               placeholder="Mensagem... ⏎ enviar · ⇧⏎ nova linha"
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
