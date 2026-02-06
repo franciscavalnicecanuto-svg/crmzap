@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useRef, Suspense } from 'react'
+import { useEffect, useState, useRef, Suspense, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -16,6 +16,8 @@ import { OnboardingTour } from '@/components/onboarding-tour'
 import { logAction, ActionHistory } from '@/components/action-history'
 // ReportsModal moved to /reports page
 import { useSettings } from '@/components/theme-provider'
+import { useDebounce } from '@/hooks/use-debounce'
+import { SearchHighlight, PhoneHighlight } from '@/components/search-highlight'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -301,6 +303,8 @@ function ChatPanelWrapper({
 function DashboardContent() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [search, setSearch] = useState('')
+  // UX improvement: Debounce search to avoid excessive re-renders
+  const debouncedSearch = useDebounce(search, 200)
   const [isConnected, setIsConnected] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -1080,9 +1084,10 @@ function DashboardContent() {
     return true
   }
   
-  const filteredLeads = leads.filter(lead => {
+  // UX improvement: Use debounced search for filtering to avoid excessive re-renders
+  const filteredLeads = useMemo(() => leads.filter(lead => {
     // Bug fix #24: Trim search to avoid false negatives with leading/trailing spaces
-    const searchTrimmed = search.trim()
+    const searchTrimmed = debouncedSearch.trim()
     const searchNorm = normalizeText(searchTrimmed)
     const searchDigits = searchTrimmed.replace(/\D/g, '')
     // Bug fix #13: Normalize phone search (search "5511" matches "+55 11 99999-0000")
@@ -1093,7 +1098,7 @@ function DashboardContent() {
     // UX #49: Filter by unread status
     const matchesUnread = !showUnreadOnly || hasUnreadMessages(lead)
     return matchesSearch && matchesDate && matchesTag && matchesUnread
-  })
+  }), [leads, debouncedSearch, tagFilter, dateFilter, showUnreadOnly])
 
   const getLeadsByStatus = (status: LeadStatus) => 
     filteredLeads.filter(lead => lead.status === status)
@@ -1691,7 +1696,16 @@ function DashboardContent() {
                                   <div className="flex items-center gap-1">
                                     <h3 className={`${settings.compactView ? 'text-[10px]' : 'text-[11px]'} truncate leading-tight ${
                                       hasUnread ? 'font-bold' : 'font-medium'
-                                    }`}>{lead.name}</h3>
+                                    }`}>
+                                      {/* UX improvement: Highlight search term in lead name */}
+                                      {debouncedSearch.trim() ? (
+                                        <SearchHighlight 
+                                          text={lead.name} 
+                                          searchTerm={debouncedSearch}
+                                          highlightClassName="bg-yellow-200 text-yellow-900 rounded-sm px-0.5"
+                                        />
+                                      ) : lead.name}
+                                    </h3>
                                     {hasUnread && (
                                       <span className={`flex-shrink-0 ${settings.compactView ? 'w-3.5 h-3.5 text-[7px]' : 'w-4 h-4 text-[8px]'} bg-green-500 text-white rounded-full flex items-center justify-center font-bold`}>
                                         {lead.unreadCount! > 9 ? '9+' : lead.unreadCount}
