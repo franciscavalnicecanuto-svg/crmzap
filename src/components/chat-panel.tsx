@@ -870,28 +870,41 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
         />
       )}
 
-      {/* Input */}
+      {/* Input - UX #67: Improved with multiline support and character counter */}
       <div className="p-3 border-t">
         {sendError && (
-          <div className="mb-2 px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-600">
+          <div className="mb-2 px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-600 animate-in fade-in-0 duration-200">
             {sendError}
           </div>
         )}
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-end">
           <TemplateButton onSelect={(content) => setNewMessage(content)} />
-          <Input
-            placeholder="Digite uma mensagem..."
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="flex-1 h-9 text-sm"
-            disabled={isSending}
-          />
+          <div className="flex-1 relative">
+            <textarea
+              placeholder="Digite uma mensagem... (Enter envia, Shift+Enter quebra linha)"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="w-full min-h-[36px] max-h-32 px-3 py-2 text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ height: Math.min(Math.max(36, newMessage.split('\n').length * 20 + 16), 128) }}
+              disabled={isSending}
+              rows={1}
+            />
+            {/* UX #68: Character counter when message is getting long */}
+            {newMessage.length > 100 && (
+              <span className={`absolute bottom-1 right-2 text-[10px] ${
+                newMessage.length > 1000 ? 'text-amber-500' : 'text-muted-foreground'
+              }`}>
+                {newMessage.length}
+              </span>
+            )}
+          </div>
           <Button 
             size="sm" 
-            className="h-9 bg-green-500 hover:bg-green-600"
+            className="h-9 bg-green-500 hover:bg-green-600 shrink-0"
             onClick={sendMessage}
             disabled={isSending || !newMessage.trim()}
+            title="Enviar mensagem (Enter)"
           >
             {isSending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
