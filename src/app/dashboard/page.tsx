@@ -1349,6 +1349,23 @@ function DashboardContent() {
           showToast(`📱 Abrindo WhatsApp...`, 'info')
           return
         }
+        // UX #602: Ctrl+Shift+U to mark as unread
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'U') {
+          e.preventDefault()
+          // Remove from readLeads set to mark as unread
+          if (readLeads.has(selectedLead.id)) {
+            setReadLeads(prev => {
+              const newSet = new Set(prev)
+              newSet.delete(selectedLead.id)
+              return newSet
+            })
+            showToast(`📬 ${selectedLead.name.split(' ')[0]}: marcada como não lida`, 'info')
+            if ('vibrate' in navigator) navigator.vibrate([10, 50, 10])
+          } else {
+            showToast(`Conversa já está como não lida`, 'info')
+          }
+          return
+        }
         // 'Enter' to open chat on mobile
         if (e.key === 'Enter' && isMobile && !showChat) {
           e.preventDefault()

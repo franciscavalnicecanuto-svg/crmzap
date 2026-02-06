@@ -12,6 +12,8 @@
 - `src/app/reminders/page.tsx`
 - `src/components/reminder-notification.tsx`
 - `src/app/globals.css`
+- `src/app/connect/page.tsx`
+- `src/components/empty-state.tsx`
 
 ---
 
@@ -23,6 +25,14 @@
 **Arquivo:** `src/components/chat-panel.tsx`
 **Solução:** Adicionado `textareaRef.current.style.height = 'auto'` após envio bem-sucedido
 **Commit:** `7907ff3`
+
+#### Bug #520: Memory leak no countdown do QR code
+**Arquivo:** `src/app/connect/page.tsx`
+**Solução:** 
+- Adicionado `useRef` para armazenar referência do interval
+- Cleanup adequado antes de criar novo interval
+- Evita intervals duplicados em re-renders
+**Commit:** `7121a05`
 
 ---
 
@@ -57,6 +67,30 @@
 - Limpa seleção após 200ms
 **Commit:** `4e923db`
 
+#### UX #521: Barra de progresso visual no countdown do QR
+**Arquivo:** `src/app/connect/page.tsx`
+**Descrição:**
+- Barra de progresso gradiente que diminui com o tempo
+- Cor muda para âmbar nos últimos 10 segundos
+- Ícone de refresh gira nos últimos 10s
+**Commit:** `7121a05`
+
+#### UX #522: Estado de conexão bem-sucedida melhorado
+**Arquivo:** `src/app/connect/page.tsx`
+**Descrição:**
+- Animação de celebração com confetti dots
+- Card com próximos passos (onboarding)
+- Botão maior e mais destacado para dashboard
+**Commit:** `7121a05`
+
+#### UX #523: Ordenação de lembretes por data ou nome
+**Arquivo:** `src/app/reminders/page.tsx`
+**Descrição:**
+- Botões toggle para ordenar por Data ou Nome
+- Indicador visual de direção (asc/desc)
+- Clique no mesmo botão inverte a direção
+**Commit:** `9a97ae2`
+
 ---
 
 ### 💅 CSS Animations (8 novas)
@@ -77,22 +111,29 @@
 
 ---
 
-## 📊 Resumo
+## 📊 Resumo Final
 
 | Categoria | Quantidade |
 |-----------|------------|
-| Bugs Corrigidos | 1 |
-| Melhorias UX | 4 |
+| Bugs Corrigidos | 2 |
+| Melhorias UX | 7 |
 | Animações CSS | 8 |
-| Commits | 4 |
+| Commits | 6 |
 
 ---
 
 ## 🚀 Deploy
 
-**Status:** Pendente verificação de build
+**Status:** Em andamento
 **Branch:** main
+**Commits:**
+- `7907ff3` - Bug fix textarea + UX copiar conversa
+- `c96a819` - UX sync progress + contador mensagens
+- `4e923db` - UX quick replies feedback
+- `3144513` - CSS animations
+- `7121a05` - Fix memory leak + UX conexão
+- `9a97ae2` - UX ordenação lembretes
 
 ---
 
-*Última atualização: 2026-02-06 12:15*
+*Última atualização: 2026-02-06 13:40*

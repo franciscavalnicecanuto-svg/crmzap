@@ -998,6 +998,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
 
   // UX #110: Improved empty state with helpful tips when no lead is selected
   // UX #171: Enhanced accessibility with ARIA live regions
+  // UX #600: Added animated typing dots for better visual feedback
   if (!lead) {
     return (
       <div 
@@ -1005,23 +1006,29 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
         role="status"
         aria-live="polite"
       >
-        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-4 empty-state-glow">
+        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-4 empty-state-glow relative">
           <MessageCircle className="w-10 h-10 text-green-500" />
+          {/* Animated typing dots */}
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-1 bg-white px-2 py-1 rounded-full shadow-sm border border-green-200">
+            <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+          </div>
         </div>
         <h3 className="font-semibold text-base mb-2">Selecione uma conversa</h3>
         <p className="text-muted-foreground text-sm mb-6 max-w-[220px]">
           Clique em um lead no kanban para ver a conversa e enviar mensagens
         </p>
         <div className="space-y-2 text-xs text-muted-foreground max-w-[200px]">
-          <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
+          <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
             <span className="text-lg" aria-hidden="true">💡</span>
             <span>Arraste cards para mudar o status do lead</span>
           </div>
-          <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
+          <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
             <span className="text-lg" aria-hidden="true">🔔</span>
             <span>Crie lembretes para não esquecer follow-ups</span>
           </div>
-          <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
+          <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg hover:bg-muted/50 transition-colors">
             <span className="text-lg" aria-hidden="true">🤖</span>
             <span>Use a IA para analisar conversas</span>
           </div>

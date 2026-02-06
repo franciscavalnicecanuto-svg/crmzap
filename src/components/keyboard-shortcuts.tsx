@@ -28,6 +28,11 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     shortcuts: [
       { keys: ['t'], description: 'Abrir tags' },
       { keys: ['r'], description: 'Criar/editar lembrete' },
+      { keys: ['v'], description: 'Toggle VIP' },
+      { keys: ['u'], description: 'Toggle Urgente' },
+      { keys: ['c'], description: 'Copiar telefone' },
+      { keys: ['w'], description: 'Abrir no WhatsApp' },
+      { keys: ['Ctrl', 'Shift', 'U'], description: 'Marcar como não lida' },
       { keys: ['Enter'], description: 'Abrir conversa' },
     ]
   },
