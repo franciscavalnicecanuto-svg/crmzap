@@ -36,6 +36,53 @@ const INTENT_COLORS: Record<string, string> = {
   outro: 'bg-gray-100 text-gray-700 border-gray-200'
 }
 
+// UX #140: Smart local fallback suggestions based on conversation patterns
+const LOCAL_FALLBACK_SUGGESTIONS: Record<string, { suggestions: string[], intent: string, intentLabel: string }> = {
+  greeting: {
+    suggestions: ['Olá! Tudo bem?', 'Oi! Posso ajudar?', 'Bom dia! Em que posso ajudar?'],
+    intent: 'saudação',
+    intentLabel: 'Saudação'
+  },
+  price: {
+    suggestions: ['O valor é R$ [valor]', 'Posso parcelar em até 12x', 'Temos condições especiais hoje!'],
+    intent: 'preço',
+    intentLabel: 'Pergunta sobre preço'
+  },
+  question: {
+    suggestions: ['Boa pergunta! Deixa eu explicar...', 'Claro, vou te explicar melhor', 'Vou te mandar mais detalhes'],
+    intent: 'dúvida',
+    intentLabel: 'Dúvida do cliente'
+  },
+  objection: {
+    suggestions: ['Entendo sua preocupação', 'Posso te dar um desconto especial', 'Vamos encontrar uma solução'],
+    intent: 'objeção',
+    intentLabel: 'Objeção'
+  },
+  closing: {
+    suggestions: ['Perfeito! Vou enviar os dados', 'Quer pagar por Pix ou cartão?', 'Fechado! Vou te mandar o link'],
+    intent: 'fechamento',
+    intentLabel: 'Momento de fechar'
+  },
+  default: {
+    suggestions: ['Entendi!', 'Posso te ajudar com mais algo?', 'Vou verificar e te retorno'],
+    intent: 'outro',
+    intentLabel: 'Conversa geral'
+  }
+}
+
+// UX #140: Detect intent from last message for local fallback
+function detectLocalIntent(lastMessage: string): keyof typeof LOCAL_FALLBACK_SUGGESTIONS {
+  const text = lastMessage.toLowerCase()
+  
+  if (/quanto|preço|valor|custa|pagar|parcel/i.test(text)) return 'price'
+  if (/oi|olá|bom dia|boa tarde|boa noite|hey|hello/i.test(text)) return 'greeting'
+  if (/como|onde|quando|qual|porque|por que|\?/i.test(text)) return 'question'
+  if (/caro|não sei|vou pensar|depois|talvez|difícil/i.test(text)) return 'objection'
+  if (/quero|fechado|pode ser|aceito|combinado|vamos|ok/i.test(text)) return 'closing'
+  
+  return 'default'
+}
+
 // UX #61: Skeleton for loading state
 const SuggestionSkeleton = () => (
   <div className="flex flex-wrap gap-1.5">
@@ -138,8 +185,20 @@ export function AISuggestions({ messages, leadName, onSelectSuggestion }: AISugg
       if (err?.name === 'AbortError') return
       
       console.error('Failed to fetch suggestions:', err)
-      setError(err.message || 'Erro ao gerar sugestões')
-      setSuggestions([])
+      
+      // UX #140: Use local fallback suggestions when API fails
+      const lastUserMessage = messages.filter(m => m.role === 'user').pop()
+      if (lastUserMessage) {
+        const detectedIntent = detectLocalIntent(lastUserMessage.content)
+        const fallback = LOCAL_FALLBACK_SUGGESTIONS[detectedIntent]
+        setSuggestions(fallback.suggestions)
+        setIntent(fallback.intent)
+        setIntentLabel(`${fallback.intentLabel} (offline)`)
+        setError(null) // Clear error since we have fallback
+      } else {
+        setError(err.message || 'Erro ao gerar sugestões')
+        setSuggestions([])
+      }
     } finally {
       setIsLoading(false)
     }
