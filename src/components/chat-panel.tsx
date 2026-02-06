@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { X, Send, Loader2, Sparkles, RefreshCw, Maximize2, Minimize2, Image, FileText, Video, Mic, History, ChevronDown, ArrowLeft, Tag, Bell, MoreVertical, AlertCircle, MessageCircle } from 'lucide-react'
+import { X, Send, Loader2, Sparkles, RefreshCw, Maximize2, Minimize2, Image, FileText, Video, Mic, History, ChevronDown, ArrowLeft, Tag, Bell, MoreVertical, AlertCircle, MessageCircle, Copy, Check, Share2 } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -142,9 +142,11 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   const [isLoadingHistory, setIsLoadingHistory] = useState(false) // Bug fix #22: Loading state for history
   const [sendError, setSendError] = useState<string | null>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
+  const [newMessageIndicator, setNewMessageIndicator] = useState(0) // UX #142: Count of new messages while scrolled up
   const [isFirstLoad, setIsFirstLoad] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null) // Bug fix #11: Mostrar erro de fetch
   const [retryCount, setRetryCount] = useState(0) // Bug fix #107: Track retry attempts
+  const [analysisCopied, setAnalysisCopied] = useState(false) // UX #141: Copy analysis button state
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<Message[]>([]) // Bug fix #14: Track messages for comparison
@@ -168,6 +170,10 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current
     const isNearBottom = scrollHeight - scrollTop - clientHeight < 100
     setShowScrollButton(!isNearBottom)
+    // UX #142: Clear new message indicator when user scrolls to bottom
+    if (isNearBottom && newMessageIndicator > 0) {
+      setNewMessageIndicator(0)
+    }
   }
 
   // Mark conversation as read on server
@@ -229,9 +235,29 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   // Scroll to bottom when messages load or change
   useEffect(() => {
     if (messages.length > 0 && !isLoading) {
-      // On first load, scroll instantly. On new messages, scroll smooth
-      scrollToBottom(!isFirstLoad)
-      setTimeout(() => scrollToBottom(!isFirstLoad), 100)
+      // UX #142: Check if user is scrolled up and new messages arrived
+      const prevCount = messagesRef.current.length
+      const newCount = messages.length
+      const isScrolledUp = containerRef.current && 
+        (containerRef.current.scrollHeight - containerRef.current.scrollTop - containerRef.current.clientHeight > 100)
+      
+      if (newCount > prevCount && isScrolledUp && !isFirstLoad) {
+        // User is scrolled up and new messages arrived - show indicator
+        const newMessagesCount = newCount - prevCount
+        const lastNewMessage = messages[messages.length - 1]
+        // Only count incoming messages (not from me)
+        if (lastNewMessage && !lastNewMessage.fromMe) {
+          setNewMessageIndicator(prev => prev + newMessagesCount)
+          // Haptic feedback for new message
+          if ('vibrate' in navigator) navigator.vibrate([5, 30, 5])
+        }
+      } else {
+        // On first load or when at bottom, scroll instantly. On new messages, scroll smooth
+        scrollToBottom(!isFirstLoad)
+        setTimeout(() => scrollToBottom(!isFirstLoad), 100)
+        setNewMessageIndicator(0)
+      }
+      
       if (isFirstLoad) {
         setIsFirstLoad(false)
       }
@@ -874,6 +900,27 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
               </Button>
             </div>
             <div className="flex items-center gap-1">
+              {/* UX #141: Copy analysis button */}
+              {analysis && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className={`h-6 w-6 transition-colors ${analysisCopied ? 'text-green-600' : 'text-purple-600 hover:text-purple-800'}`}
+                  onClick={() => {
+                    navigator.clipboard.writeText(analysis.replace(/\*\*/g, '').replace(/###?\s/g, ''))
+                    setAnalysisCopied(true)
+                    if ('vibrate' in navigator) navigator.vibrate(10)
+                    setTimeout(() => setAnalysisCopied(false), 2000)
+                  }}
+                  title={analysisCopied ? 'Copiado!' : 'Copiar análise'}
+                >
+                  {analysisCopied ? (
+                    <Check className="h-3 w-3" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                </Button>
+              )}
               {analysis && (
                 <Button 
                   variant="ghost" 
@@ -1101,15 +1148,43 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
           </div>
         )}
 
-        {/* Scroll to bottom button */}
+        {/* Scroll to bottom button - UX #142: Shows new message count when scrolled up */}
         {showScrollButton && messages.length > 0 && (
           <Button
             size="icon"
-            className="absolute bottom-4 right-4 h-8 w-8 rounded-full bg-white shadow-lg border hover:bg-gray-50 animate-in fade-in-0 zoom-in-75 duration-200"
-            onClick={() => scrollToBottom(true)}
+            className={`absolute bottom-4 right-4 h-8 w-8 rounded-full shadow-lg border animate-in fade-in-0 zoom-in-75 duration-200 ${
+              newMessageIndicator > 0 
+                ? 'bg-green-500 hover:bg-green-600 border-green-400' 
+                : 'bg-white hover:bg-gray-50'
+            }`}
+            onClick={() => {
+              scrollToBottom(true)
+              setNewMessageIndicator(0)
+            }}
           >
-            <ChevronDown className="h-4 w-4 text-gray-600" />
+            {newMessageIndicator > 0 ? (
+              <div className="flex items-center justify-center">
+                <span className="text-white text-[10px] font-bold">
+                  {newMessageIndicator > 9 ? '9+' : newMessageIndicator}
+                </span>
+              </div>
+            ) : (
+              <ChevronDown className="h-4 w-4 text-gray-600" />
+            )}
           </Button>
+        )}
+        
+        {/* UX #142: Floating new message toast when scrolled up */}
+        {newMessageIndicator > 0 && showScrollButton && (
+          <div 
+            className="absolute bottom-14 right-4 bg-green-500 text-white px-3 py-1.5 rounded-full shadow-lg text-xs font-medium animate-in slide-in-from-bottom-2 cursor-pointer hover:bg-green-600 transition-colors"
+            onClick={() => {
+              scrollToBottom(true)
+              setNewMessageIndicator(0)
+            }}
+          >
+            {newMessageIndicator} nova{newMessageIndicator > 1 ? 's' : ''} mensagem{newMessageIndicator > 1 ? 's' : ''} ↓
+          </div>
         )}
       </div>
 
