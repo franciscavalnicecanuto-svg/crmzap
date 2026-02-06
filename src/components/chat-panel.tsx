@@ -970,7 +970,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
           <TemplateButton onSelect={(content) => setNewMessage(content)} />
           <div className="flex-1 relative">
             <textarea
-              placeholder="Digite uma mensagem... (Enter envia, Shift+Enter quebra linha)"
+              placeholder="Mensagem... ⏎ enviar · ⇧⏎ nova linha"
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -980,6 +980,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
               style={{ height: Math.min(Math.max(36, newMessage.split('\n').length * 20 + 16), 128) }}
               disabled={isSending}
               rows={1}
+              aria-label="Campo de mensagem. Enter para enviar, Shift+Enter para nova linha"
             />
             {/* UX #68: Character counter when message is getting long */}
             {newMessage.length > 100 && !isSending && (

@@ -805,22 +805,46 @@ function DashboardContent() {
   }
 
   // Sync messages from Evolution API to database
+  // UX #89: Enhanced sync with detailed feedback
   const syncMessages = async () => {
     setIsSyncing(true)
     setImportError(null)
+    
+    // UX #89: Show initial toast
+    showToast('🔄 Sincronizando mensagens...', 'info')
+    
     try {
-      const res = await fetch('/api/sync', { method: 'POST' })
+      const res = await fetch('/api/sync', { 
+        method: 'POST',
+        // Bug fix #90: Add timeout to prevent hanging
+        signal: AbortSignal.timeout(60000) // 60s timeout
+      })
       const data = await res.json()
       
       if (data.success) {
         console.log(`Synced ${data.saved}/${data.total} messages`)
+        
+        // UX #89: Show detailed success feedback
+        const syncMessage = data.saved > 0 
+          ? `✅ ${data.saved} mensagens sincronizadas!`
+          : '✅ Tudo sincronizado (sem novas mensagens)'
+        showToast(syncMessage, 'success')
+        
         // After sync, reload leads
         await importFromWhatsApp()
       } else {
         setImportError(data.error || 'Falha ao sincronizar')
+        showToast('❌ Falha ao sincronizar', 'error')
       }
     } catch (err: any) {
-      setImportError(err.message || 'Erro ao sincronizar')
+      // Bug fix #90: Handle timeout specifically
+      if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+        setImportError('Sincronização demorou muito. Tente novamente.')
+        showToast('⏱️ Timeout - tente novamente', 'error')
+      } else {
+        setImportError(err.message || 'Erro ao sincronizar')
+        showToast('❌ Erro ao sincronizar', 'error')
+      }
     } finally {
       setIsSyncing(false)
     }

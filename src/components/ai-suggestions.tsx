@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Sparkles, Loader2, RefreshCw, AlertCircle, MessageCircle, DollarSign, HelpCircle, ThumbsUp, ShoppingCart, Hand, Zap, WifiOff, X } from 'lucide-react'
+import { Sparkles, Loader2, RefreshCw, AlertCircle, MessageCircle, DollarSign, HelpCircle, ThumbsUp, ShoppingCart, Hand, Zap, WifiOff, X, Clock } from 'lucide-react'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -45,6 +45,18 @@ const SuggestionSkeleton = () => (
   </div>
 )
 
+// Bug fix #86: Debounce hook to prevent excessive API calls
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+  
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedValue(value), delay)
+    return () => clearTimeout(timer)
+  }, [value, delay])
+  
+  return debouncedValue
+}
+
 export function AISuggestions({ messages, leadName, onSelectSuggestion }: AISuggestionsProps) {
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [intent, setIntent] = useState<string | null>(null)
@@ -53,10 +65,21 @@ export function AISuggestions({ messages, leadName, onSelectSuggestion }: AISugg
   const [error, setError] = useState<string | null>(null) // Bug fix #62: Track API errors
   const [lastMessageCount, setLastMessageCount] = useState(0)
   const [isMinimized, setIsMinimized] = useState(false) // UX #63: Collapsible panel
+  const [cooldown, setCooldown] = useState(0) // Bug fix #86: Rate limit cooldown
   const abortControllerRef = useRef<AbortController | null>(null)
+  const cooldownIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Bug fix #86: Debounce message changes to prevent rapid API calls
+  const debouncedMessages = useDebounce(messages, 500)
 
   const fetchSuggestions = useCallback(async () => {
     if (!messages || messages.length === 0) return
+    
+    // Bug fix #86: Respect cooldown period
+    if (cooldown > 0) {
+      setError(`Aguarde ${cooldown}s para novas sugestões`)
+      return
+    }
     
     // Cancel any pending request
     abortControllerRef.current?.abort()
@@ -74,7 +97,21 @@ export function AISuggestions({ messages, leadName, onSelectSuggestion }: AISugg
       })
       
       if (!response.ok) {
-        throw new Error(response.status === 429 ? 'Muitas requisições. Aguarde.' : 'Erro ao gerar sugestões')
+        if (response.status === 429) {
+          // Bug fix #86: Set cooldown on rate limit
+          setCooldown(30)
+          cooldownIntervalRef.current = setInterval(() => {
+            setCooldown(prev => {
+              if (prev <= 1) {
+                if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current)
+                return 0
+              }
+              return prev - 1
+            })
+          }, 1000)
+          throw new Error('Muitas requisições. Aguarde 30s.')
+        }
+        throw new Error('Erro ao gerar sugestões')
       }
       
       const data = await response.json()
@@ -97,26 +134,27 @@ export function AISuggestions({ messages, leadName, onSelectSuggestion }: AISugg
     } finally {
       setIsLoading(false)
     }
-  }, [messages, leadName])
+  }, [messages, leadName, cooldown])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort()
+      if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current)
     }
   }, [])
 
-  // Auto-fetch when new message from client arrives
+  // Bug fix #86: Auto-fetch with debounce when new message from client arrives
   useEffect(() => {
-    if (messages.length > lastMessageCount) {
-      const lastMessage = messages[messages.length - 1]
-      // Only auto-fetch if last message is from client
-      if (lastMessage?.role === 'user') {
+    if (debouncedMessages.length > lastMessageCount) {
+      const lastMessage = debouncedMessages[debouncedMessages.length - 1]
+      // Only auto-fetch if last message is from client and not in cooldown
+      if (lastMessage?.role === 'user' && cooldown === 0) {
         fetchSuggestions()
       }
-      setLastMessageCount(messages.length)
+      setLastMessageCount(debouncedMessages.length)
     }
-  }, [messages.length, lastMessageCount, fetchSuggestions])
+  }, [debouncedMessages.length, lastMessageCount, fetchSuggestions, cooldown])
 
   // UX #66: Don't show anything if minimized
   if (isMinimized) {
@@ -180,17 +218,27 @@ export function AISuggestions({ messages, leadName, onSelectSuggestion }: AISugg
         <SuggestionSkeleton />
       )}
 
-      {/* Bug fix #62: Error State */}
+      {/* Bug fix #62 & #86: Error State with cooldown indicator */}
       {error && !isLoading && (
-        <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 px-2 py-1.5 rounded">
-          <WifiOff className="w-3 h-3 shrink-0" />
-          <span className="flex-1">{error}</span>
-          <button
-            onClick={fetchSuggestions}
-            className="text-red-700 hover:text-red-800 underline"
-          >
-            Tentar novamente
-          </button>
+        <div className={`flex items-center gap-2 text-xs px-2 py-1.5 rounded ${
+          cooldown > 0 ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-600'
+        }`}>
+          {cooldown > 0 ? (
+            <Clock className="w-3 h-3 shrink-0 animate-pulse" />
+          ) : (
+            <WifiOff className="w-3 h-3 shrink-0" />
+          )}
+          <span className="flex-1">
+            {cooldown > 0 ? `Aguarde ${cooldown}s para novas sugestões` : error}
+          </span>
+          {cooldown === 0 && (
+            <button
+              onClick={fetchSuggestions}
+              className="text-red-700 hover:text-red-800 underline"
+            >
+              Tentar novamente
+            </button>
+          )}
         </div>
       )}
 
