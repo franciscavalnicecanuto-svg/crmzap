@@ -32,7 +32,16 @@ interface Lead {
   lastMessage?: string
 }
 
-type FilterType = 'all' | 'today' | 'overdue' | 'upcoming'
+type FilterType = 'all' | 'today' | 'overdue' | 'upcoming' | 'completed'
+
+interface CompletedReminder {
+  leadId: string
+  leadName: string
+  phone: string
+  reminderDate?: string
+  reminderNote?: string
+  completedAt: string
+}
 
 export default function RemindersPage() {
   const router = useRouter()
@@ -40,6 +49,8 @@ export default function RemindersPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [filter, setFilter] = useState<FilterType>('all')
   const [searchTerm, setSearchTerm] = useState('')
+  const [completedReminders, setCompletedReminders] = useState<CompletedReminder[]>([])
+  const [completingId, setCompletingId] = useState<string | null>(null) // UX: Animation state
 
   useEffect(() => {
     async function load() {
@@ -53,6 +64,11 @@ export default function RemindersPage() {
         const saved = localStorage.getItem('whatszap-leads-v3')
         if (saved) {
           setLeads(JSON.parse(saved))
+        }
+        // Load completed reminders history
+        const completedHistory = localStorage.getItem('whatszap-completed-reminders')
+        if (completedHistory) {
+          setCompletedReminders(JSON.parse(completedHistory))
         }
       } catch (e) {
         console.error('Failed to load:', e)
@@ -73,26 +89,35 @@ export default function RemindersPage() {
 
   // Bug fix: markAsDone now records completion before clearing
   // UX #126: Added toast feedback for completed reminders
+  // UX improvement: Animation on completion
   const markAsDone = (leadId: string) => {
     const lead = leads.find(l => l.id === leadId)
     if (lead) {
+      // Trigger completion animation
+      setCompletingId(leadId)
+      
       // Save to completed reminders history
-      const history = JSON.parse(localStorage.getItem('whatszap-completed-reminders') || '[]')
-      history.unshift({
+      const newCompleted: CompletedReminder = {
         leadId: lead.id,
         leadName: lead.name,
         phone: lead.phone,
         reminderDate: lead.reminderDate,
         reminderNote: lead.reminderNote,
         completedAt: new Date().toISOString()
-      })
-      // Keep only last 50 completed reminders
-      localStorage.setItem('whatszap-completed-reminders', JSON.stringify(history.slice(0, 50)))
+      }
+      const updatedHistory = [newCompleted, ...completedReminders].slice(0, 50)
+      setCompletedReminders(updatedHistory)
+      localStorage.setItem('whatszap-completed-reminders', JSON.stringify(updatedHistory))
       
       // Haptic feedback
       if ('vibrate' in navigator) navigator.vibrate([10, 30, 10])
+      
+      // Delay removal for animation
+      setTimeout(() => {
+        clearReminder(leadId)
+        setCompletingId(null)
+      }, 400)
     }
-    clearReminder(leadId)
   }
   
   // UX #127: Bulk actions for reminders
@@ -180,6 +205,7 @@ export default function RemindersPage() {
   const filteredLeads = getFilteredLeads()
 
   // Stats (Bug fix: mutually exclusive counts)
+  // UX improvement: Added completed count for last 7 days
   const stats = {
     total: leadsWithReminders.length,
     today: leadsWithReminders.filter(l => {
@@ -188,6 +214,11 @@ export default function RemindersPage() {
     }).length,
     overdue: leadsWithReminders.filter(l => new Date(l.reminderDate!) < now).length, // Passed
     upcoming: leadsWithReminders.filter(l => new Date(l.reminderDate!) >= tomorrow).length, // Tomorrow+
+    completed: completedReminders.filter(r => {
+      const completedDate = new Date(r.completedAt)
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      return completedDate >= sevenDaysAgo
+    }).length,
   }
 
   const getReminderStatus = (dateStr: string) => {
@@ -266,7 +297,7 @@ export default function RemindersPage() {
 
       <main className="max-w-4xl mx-auto px-4 py-6">
         {/* Stats */}
-        <div className="grid grid-cols-4 gap-3 mb-6">
+        <div className="grid grid-cols-5 gap-2 mb-6">
           <button 
             onClick={() => setFilter('all')}
             className={`p-3 rounded-lg border text-center transition focus:outline-none focus:ring-2 focus:ring-amber-500 ${
@@ -306,6 +337,16 @@ export default function RemindersPage() {
           >
             <div className="text-2xl font-bold text-blue-600">{stats.upcoming}</div>
             <div className="text-xs text-muted-foreground">Próximos</div>
+          </button>
+          <button 
+            onClick={() => setFilter('completed')}
+            className={`p-3 rounded-lg border text-center transition focus:outline-none focus:ring-2 focus:ring-green-500 ${
+              filter === 'completed' ? 'border-green-500 bg-green-50' : 'hover:bg-muted/50'
+            }`}
+            aria-pressed={filter === 'completed'}
+          >
+            <div className="text-2xl font-bold text-green-600">{stats.completed}</div>
+            <div className="text-xs text-muted-foreground">Feitos (7d)</div>
           </button>
         </div>
         
@@ -358,8 +399,73 @@ export default function RemindersPage() {
           </div>
         )}
 
-        {/* Reminders List */}
-        {filteredLeads.length === 0 ? (
+        {/* Completed Reminders List (when filter is "completed") */}
+        {filter === 'completed' && (
+          <div className="space-y-3">
+            {completedReminders.length === 0 ? (
+              <div className="text-center py-16">
+                <CheckCircle className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
+                <h2 className="text-lg font-medium mb-1">Nenhum lembrete completado</h2>
+                <p className="text-muted-foreground text-sm mb-4">
+                  Quando você marcar lembretes como feitos, eles aparecerão aqui
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
+                  <span>Últimos {completedReminders.length} lembretes completados</span>
+                  <button
+                    onClick={() => {
+                      setCompletedReminders([])
+                      localStorage.setItem('whatszap-completed-reminders', '[]')
+                    }}
+                    className="text-xs text-red-500 hover:text-red-600 transition"
+                  >
+                    Limpar histórico
+                  </button>
+                </div>
+                {completedReminders.map((reminder, idx) => (
+                  <Card 
+                    key={`completed-${reminder.leadId}-${idx}`}
+                    className="p-4 bg-green-50/30 border-green-200/50"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="p-2 rounded-full bg-green-100">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-medium">{reminder.leadName}</h3>
+                          <Badge variant="outline" className="text-xs text-green-600 border-green-300">
+                            Completado
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground mb-1">
+                          📅 Original: {reminder.reminderDate ? new Date(reminder.reminderDate).toLocaleString('pt-BR', { 
+                            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+                          }) : 'N/A'}
+                        </div>
+                        <div className="text-sm text-green-600">
+                          ✓ Feito em: {new Date(reminder.completedAt).toLocaleString('pt-BR', { 
+                            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+                          })}
+                        </div>
+                        {reminder.reminderNote && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            📝 {reminder.reminderNote}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Reminders List (active reminders) */}
+        {filter !== 'completed' && filteredLeads.length === 0 ? (
           <div className="text-center py-16">
             <Bell className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
             <h2 className="text-lg font-medium mb-1">
@@ -376,14 +482,18 @@ export default function RemindersPage() {
               <Button>Ir para o Dashboard</Button>
             </Link>
           </div>
-        ) : (
+        ) : filter !== 'completed' && (
           <div className="space-y-3">
             {filteredLeads.map(lead => {
               const status = getReminderStatus(lead.reminderDate!)
               return (
                 <Card 
                   key={lead.id}
-                  className={`p-4 transition hover:shadow-md ${
+                  className={`p-4 transition-all hover:shadow-md ${
+                    completingId === lead.id 
+                      ? 'opacity-0 scale-95 translate-x-4 duration-400' 
+                      : 'opacity-100 scale-100 translate-x-0 duration-200'
+                  } ${
                     status === 'overdue' ? 'border-red-300 bg-red-50/50' :
                     status === 'today' ? 'border-amber-300 bg-amber-50/50' :
                     ''

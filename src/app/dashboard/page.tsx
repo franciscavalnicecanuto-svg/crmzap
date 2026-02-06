@@ -310,6 +310,7 @@ function DashboardContent() {
   const [isConnected, setIsConnected] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [isSyncing, setIsSyncing] = useState(false)
+  const [syncProgress, setSyncProgress] = useState(0) // UX: Visual sync progress (0-100)
   const [importError, setImportError] = useState<string | null>(null)
   const [mounted, setMounted] = useState(false)
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
@@ -814,23 +815,32 @@ function DashboardContent() {
   }
 
   // Sync messages from Evolution API to database
-  // UX #89: Enhanced sync with detailed feedback
+  // UX #89: Enhanced sync with detailed feedback and visual progress
   const syncMessages = async () => {
     setIsSyncing(true)
     setImportError(null)
+    setSyncProgress(0)
     
-    // UX #89: Show initial toast
-    showToast('🔄 Sincronizando mensagens...', 'info')
+    // Simulate progress animation while syncing
+    const progressInterval = setInterval(() => {
+      setSyncProgress(prev => {
+        if (prev >= 85) return prev // Don't go above 85% until done
+        return prev + Math.random() * 15
+      })
+    }, 500)
     
     try {
+      setSyncProgress(10)
       const res = await fetch('/api/sync', { 
         method: 'POST',
         // Bug fix #90: Add timeout to prevent hanging
         signal: AbortSignal.timeout(60000) // 60s timeout
       })
+      setSyncProgress(70)
       const data = await res.json()
       
       if (data.success) {
+        setSyncProgress(90)
         console.log(`Synced ${data.saved}/${data.total} messages`)
         
         // UX #89: Show detailed success feedback
@@ -841,6 +851,7 @@ function DashboardContent() {
         
         // After sync, reload leads
         await importFromWhatsApp()
+        setSyncProgress(100)
       } else {
         setImportError(data.error || 'Falha ao sincronizar')
         showToast('❌ Falha ao sincronizar', 'error')
@@ -855,7 +866,12 @@ function DashboardContent() {
         showToast('❌ Erro ao sincronizar', 'error')
       }
     } finally {
-      setIsSyncing(false)
+      clearInterval(progressInterval)
+      // Brief delay to show 100% before hiding
+      setTimeout(() => {
+        setIsSyncing(false)
+        setSyncProgress(0)
+      }, 500)
     }
   }
 
@@ -1095,9 +1111,22 @@ function DashboardContent() {
     const searchTrimmed = debouncedSearch.trim()
     const searchNorm = normalizeText(searchTrimmed)
     const searchDigits = searchTrimmed.replace(/\D/g, '')
-    // Bug fix #13: Normalize phone search (search "5511" matches "+55 11 99999-0000")
-    const matchesSearch = !searchTrimmed || normalizeText(lead.name).includes(searchNorm) || 
-      (searchDigits.length > 0 ? lead.phone.replace(/\D/g, '').includes(searchDigits) : lead.phone.includes(searchTrimmed))
+    const leadPhoneDigits = lead.phone.replace(/\D/g, '')
+    
+    // Bug fix #13 + UX improvement: Enhanced phone search
+    // - Full number match: "5511999990000" matches "+55 11 99999-0000"
+    // - Partial match: "999990000" matches anywhere in phone
+    // - Last 8 digits: "99990000" matches Brazilian local number format
+    const matchesPhone = searchDigits.length > 0 && (
+      leadPhoneDigits.includes(searchDigits) || // Full or partial match
+      (searchDigits.length >= 8 && leadPhoneDigits.endsWith(searchDigits)) || // Match last N digits
+      (searchDigits.length >= 4 && leadPhoneDigits.slice(-8).includes(searchDigits)) // Match within last 8 digits
+    )
+    
+    const matchesSearch = !searchTrimmed || 
+      normalizeText(lead.name).includes(searchNorm) || 
+      matchesPhone ||
+      (searchDigits.length === 0 && lead.phone.includes(searchTrimmed)) // Fallback for non-digit search
     const matchesDate = isInDateRange(lead)
     const matchesTag = !tagFilter || lead.tags?.includes(tagFilter)
     // UX #49: Filter by unread status
@@ -1390,6 +1419,23 @@ function DashboardContent() {
         {importError && (
           <div className="bg-red-50 border-b border-red-200 px-3 py-1 text-xs text-red-800">
             {importError}
+          </div>
+        )}
+
+        {/* UX: Sync Progress Bar */}
+        {isSyncing && (
+          <div className="bg-green-50 border-b border-green-200 px-3 py-2 animate-in slide-in-from-top-1 duration-200">
+            <div className="flex items-center gap-2 text-xs text-green-700 mb-1">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              <span>Sincronizando mensagens...</span>
+              <span className="ml-auto font-medium">{Math.round(syncProgress)}%</span>
+            </div>
+            <div className="w-full h-1.5 bg-green-200 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-green-500 rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${syncProgress}%` }}
+              />
+            </div>
           </div>
         )}
 

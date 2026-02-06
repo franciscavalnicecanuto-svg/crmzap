@@ -286,3 +286,53 @@
     min-width: 44px;
   }
 }
+
+/* UX: Reminder completion animation */
+@keyframes complete-slide-out {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateX(10px) scale(0.98);
+    background-color: rgba(34, 197, 94, 0.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(30px) scale(0.95);
+  }
+}
+
+.reminder-completing {
+  animation: complete-slide-out 0.4s ease-out forwards;
+}
+
+/* UX: Sync progress indicator */
+@keyframes sync-progress {
+  0% {
+    width: 0%;
+  }
+  50% {
+    width: 70%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+
+.sync-progress-bar {
+  animation: sync-progress 2s ease-in-out;
+}
+
+/* UX: Better mobile kanban scroll */
+@media (max-width: 768px) {
+  .kanban-scroll {
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .kanban-column {
+    scroll-snap-align: start;
+  }
+}
