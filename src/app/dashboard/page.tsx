@@ -1753,6 +1753,39 @@ function DashboardContent() {
                     <HelpCircle className="mr-2 h-4 w-4" />
                     Ver tour novamente
                   </DropdownMenuItem>
+                  {/* UX #711: Export leads to CSV */}
+                  <DropdownMenuItem onClick={() => {
+                    // Generate CSV content
+                    const headers = ['Nome', 'Telefone', 'Status', 'Tags', 'Valor', 'Data de Criação', 'Última Mensagem']
+                    const rows = leads.map(lead => [
+                      lead.name,
+                      lead.phone,
+                      lead.status,
+                      (lead.tags || []).join('; '),
+                      lead.value ? `R$ ${lead.value.toLocaleString('pt-BR')}` : '',
+                      lead.createdAt ? new Date(lead.createdAt).toLocaleDateString('pt-BR') : '',
+                      lead.lastMessage || ''
+                    ])
+                    
+                    const csvContent = [
+                      headers.join(','),
+                      ...rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+                    ].join('\n')
+                    
+                    // Download CSV
+                    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' })
+                    const link = document.createElement('a')
+                    link.href = URL.createObjectURL(blob)
+                    link.download = `leads_crmzap_${new Date().toISOString().split('T')[0]}.csv`
+                    link.click()
+                    URL.revokeObjectURL(link.href)
+                    
+                    showToast(`${leads.length} leads exportados`, 'success')
+                    if ('vibrate' in navigator) navigator.vibrate(10)
+                  }}>
+                    <Download className="mr-2 h-4 w-4" />
+                    Exportar Leads (CSV)
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />
