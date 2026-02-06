@@ -180,6 +180,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   const [analysisCopied, setAnalysisCopied] = useState(false) // UX #141: Copy analysis button state
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null) // UX #200: Copy individual message
   const [contextMenuMessageId, setContextMenuMessageId] = useState<string | null>(null) // UX #201: Message context menu
+  const [phoneCopied, setPhoneCopied] = useState(false) // Bug fix #271: Phone copy state
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<Message[]>([]) // Bug fix #14: Track messages for comparison
@@ -900,42 +901,47 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
                 {lead.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            {/* UX #98: Connection indicator dot */}
-            {isConnected && (
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-background rounded-full" aria-label="Conectado" />
-            )}
+            {/* UX #272: Enhanced connection indicator with status */}
+            <span 
+              className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 border-2 border-background rounded-full transition-colors ${
+                isConnected 
+                  ? 'bg-green-500' 
+                  : 'bg-amber-400 animate-pulse'
+              }`} 
+              aria-label={isConnected ? 'Conectado' : 'Desconectado'}
+              title={isConnected ? 'WhatsApp conectado' : 'WhatsApp desconectado'}
+            />
           </div>
           <div>
             <h3 className="font-medium text-sm">{lead.name}</h3>
             {/* UX #155: Phone with copy button */}
-            {/* UX #212: Enhanced phone copy with visual feedback */}
+            {/* UX #212 + Bug fix #271: Enhanced phone copy with proper state management */}
             <p className="text-xs text-muted-foreground flex items-center gap-1 group">
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(lead.phone.replace(/\D/g, ''))
-                  // Visual feedback via state
-                  const btn = document.activeElement as HTMLButtonElement
-                  if (btn) {
-                    btn.classList.add('text-green-600')
-                    btn.textContent = '✓ Copiado!'
-                    setTimeout(() => { 
-                      btn.classList.remove('text-green-600')
-                      btn.textContent = lead.phone 
-                    }, 1500)
-                  }
-                  // Haptic
+                  setPhoneCopied(true)
+                  setTimeout(() => setPhoneCopied(false), 1500)
                   if ('vibrate' in navigator) navigator.vibrate([10, 50, 10])
                 }}
-                className="hover:text-foreground hover:underline underline-offset-2 transition-all cursor-pointer active:scale-95"
+                className={`hover:text-foreground hover:underline underline-offset-2 transition-all cursor-pointer active:scale-95 ${
+                  phoneCopied ? 'text-green-600 font-medium' : ''
+                }`}
                 title="Clique para copiar número"
               >
-                {lead.phone}
+                {phoneCopied ? '✓ Copiado!' : lead.phone}
               </button>
               <Copy 
-                className="h-3 w-3 opacity-30 group-hover:opacity-70 transition-opacity cursor-pointer hover:opacity-100 hover:text-green-600"
+                className={`h-3 w-3 transition-all cursor-pointer ${
+                  phoneCopied 
+                    ? 'text-green-600 opacity-100' 
+                    : 'opacity-30 group-hover:opacity-70 hover:opacity-100 hover:text-green-600'
+                }`}
                 onClick={(e) => {
                   e.stopPropagation()
                   navigator.clipboard.writeText(lead.phone.replace(/\D/g, ''))
+                  setPhoneCopied(true)
+                  setTimeout(() => setPhoneCopied(false), 1500)
                   if ('vibrate' in navigator) navigator.vibrate(10)
                 }}
               />
@@ -1128,6 +1134,21 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
                   {analysis}
                 </div>
               )}
+            </div>
+          ) : isLoadingHistory ? (
+            /* UX #270: Loading skeleton for analysis history */
+            <div className="space-y-3 animate-pulse">
+              <p className="text-sm font-medium text-purple-700">Carregando histórico...</p>
+              {[1, 2].map((i) => (
+                <div key={i} className="p-2 bg-white rounded border border-purple-200">
+                  <div className="flex justify-between mb-2">
+                    <Skeleton className="h-3 w-24 bg-purple-100" />
+                    <Skeleton className="h-3 w-16 bg-purple-100" />
+                  </div>
+                  <Skeleton className="h-3 w-full bg-purple-100 mb-1" />
+                  <Skeleton className="h-3 w-3/4 bg-purple-100" />
+                </div>
+              ))}
             </div>
           ) : showHistory && analysisHistory.length > 0 ? (
             <div className="space-y-3">
@@ -1607,12 +1628,19 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
               ref={textareaRef}
               placeholder="Mensagem... ⏎ enviar · ⇧⏎ nova linha"
               value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
+              onChange={(e) => {
+                setNewMessage(e.target.value)
+                // Bug fix #269: Auto-resize textarea based on content
+                if (textareaRef.current) {
+                  textareaRef.current.style.height = 'auto'
+                  const scrollHeight = textareaRef.current.scrollHeight
+                  textareaRef.current.style.height = `${Math.min(scrollHeight, 128)}px`
+                }
+              }}
               onKeyDown={handleKeyDown}
-              className={`w-full min-h-[36px] max-h-32 px-3 py-2 text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all ${
+              className={`w-full min-h-[40px] max-h-32 px-3 py-2.5 text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all leading-5 ${
                 isSending ? 'bg-green-50/50 border-green-300' : ''
               }`}
-              style={{ height: Math.min(Math.max(36, newMessage.split('\n').length * 20 + 16), 128) }}
               disabled={isSending}
               rows={1}
               aria-label="Campo de mensagem. Enter para enviar, Shift+Enter para nova linha"
