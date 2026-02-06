@@ -618,8 +618,9 @@ function DashboardContent() {
       }
     }
     
-    // Delay para aguardar localStorage carregar primeiro
-    setTimeout(loadStatusFromSupabase, 500)
+    // Bug fix #50: Delay com cleanup para evitar memory leak
+    const statusTimeout = setTimeout(loadStatusFromSupabase, 500)
+    return () => clearTimeout(statusTimeout)
   }, [mounted])
 
   // Save read state to localStorage when it changes
