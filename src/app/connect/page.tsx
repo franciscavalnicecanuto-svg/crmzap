@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
@@ -131,11 +131,20 @@ export default function ConnectPage() {
     return () => clearInterval(interval)
   }, [state, checkStatus])
 
-  // Countdown for QR code expiration
+  // Bug fix #520: Countdown for QR code expiration with proper cleanup
+  // Uses ref to avoid recreating interval when generateQRCode changes
+  const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  
   useEffect(() => {
+    // Clear any existing interval first to prevent memory leak
+    if (countdownIntervalRef.current) {
+      clearInterval(countdownIntervalRef.current)
+      countdownIntervalRef.current = null
+    }
+    
     if (state !== 'waiting_scan') return
 
-    const timer = setInterval(() => {
+    countdownIntervalRef.current = setInterval(() => {
       setCountdown(prev => {
         if (prev <= 1) {
           // QR code expired, generate new one
@@ -146,7 +155,12 @@ export default function ConnectPage() {
       })
     }, 1000)
 
-    return () => clearInterval(timer)
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current)
+        countdownIntervalRef.current = null
+      }
+    }
   }, [state, generateQRCode])
 
   // Check status on mount
@@ -176,21 +190,50 @@ export default function ConnectPage() {
         {/* Main Content */}
         <main className="flex-1 flex items-center justify-center p-4 sm:p-6">
           <div className="w-full max-w-md">
-            {/* Connected State */}
+            {/* Connected State - UX #522: Enhanced with celebration and next steps */}
             {state === 'connected' && (
-              <Card className="p-8 text-center border-green-200 dark:border-green-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-xl">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-500/30">
-                  <CheckCircle2 className="w-10 h-10 text-white" />
+              <Card className="p-8 text-center border-green-200 dark:border-green-800 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm shadow-xl animate-in zoom-in-95 fade-in-0 duration-300">
+                {/* Celebration animation */}
+                <div className="relative w-20 h-20 mx-auto mb-6">
+                  <div className="absolute inset-0 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 animate-pulse" />
+                  <div className="relative w-full h-full rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/30">
+                    <CheckCircle2 className="w-10 h-10 text-white" />
+                  </div>
+                  {/* Confetti dots */}
+                  <span className="absolute -top-2 -left-2 w-3 h-3 rounded-full bg-yellow-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="absolute -top-1 -right-3 w-2 h-2 rounded-full bg-blue-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="absolute -bottom-1 -left-1 w-2 h-2 rounded-full bg-pink-400 animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
                 <h1 className="text-2xl font-bold mb-2 text-green-700 dark:text-green-400">
-                  WhatsApp Conectado!
+                  🎉 WhatsApp Conectado!
                 </h1>
-                <p className="text-muted-foreground mb-6">
+                <p className="text-muted-foreground mb-4">
                   Seu WhatsApp está pronto para receber e enviar mensagens.
                 </p>
+                {/* Quick tips */}
+                <div className="mb-6 p-3 bg-green-50 dark:bg-green-900/30 rounded-lg text-left text-sm space-y-2">
+                  <p className="font-medium text-green-700 dark:text-green-400 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    Próximos passos:
+                  </p>
+                  <ul className="text-green-600 dark:text-green-300 space-y-1 text-xs">
+                    <li className="flex items-start gap-2">
+                      <span>1.</span>
+                      <span>Importe seus contatos no dashboard</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span>2.</span>
+                      <span>Organize leads no kanban (arraste para mover)</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span>3.</span>
+                      <span>Crie lembretes para follow-ups importantes</span>
+                    </li>
+                  </ul>
+                </div>
                 <div className="space-y-3">
                   <Link href="/dashboard">
-                    <Button className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-500/25">
+                    <Button className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-500/25 h-12 text-base">
                       Ir para o Dashboard
                       <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
@@ -278,11 +321,23 @@ export default function ConnectPage() {
                   </div>
                 </div>
 
-                {/* Countdown */}
-                <div className="mt-6 text-center">
-                  <div className="inline-flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
-                    <RefreshCw className="w-3 h-3" />
-                    <span>Atualiza em {countdown}s</span>
+                {/* UX #521: Countdown with visual progress bar */}
+                <div className="mt-6 text-center space-y-2">
+                  <div className="relative w-48 mx-auto">
+                    {/* Progress bar background */}
+                    <div className="h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                      {/* Progress bar fill - animates smoothly */}
+                      <div 
+                        className="h-full bg-gradient-to-r from-green-400 to-emerald-500 rounded-full transition-all duration-1000 ease-linear"
+                        style={{ width: `${(countdown / 60) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                    <RefreshCw className={`w-3 h-3 ${countdown <= 10 ? 'animate-spin' : ''}`} />
+                    <span className={countdown <= 10 ? 'text-amber-500 font-medium' : ''}>
+                      {countdown <= 10 ? `⏱️ ${countdown}s` : `Atualiza em ${countdown}s`}
+                    </span>
                   </div>
                 </div>
 
