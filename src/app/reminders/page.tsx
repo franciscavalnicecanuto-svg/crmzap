@@ -972,7 +972,13 @@ export default function RemindersPage() {
                                 )
                                 setLeads(updated)
                                 localStorage.setItem('whatszap-leads-v3', JSON.stringify(updated))
-                                if ('vibrate' in navigator) navigator.vibrate(10)
+                                // Haptic + visual feedback
+                                if ('vibrate' in navigator) navigator.vibrate([10, 20, 10])
+                                const card = document.querySelector(`[data-reminder-id="${lead.id}"]`)
+                                if (card) {
+                                  card.classList.add('snooze-success')
+                                  setTimeout(() => card.classList.remove('snooze-success'), 600)
+                                }
                               }}
                               title={option.title}
                             >
@@ -997,7 +1003,7 @@ export default function RemindersPage() {
                               key={option.label}
                               variant="ghost"
                               size="sm"
-                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 h-7 text-xs active:scale-95 transition-transform"
+                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 h-7 text-xs active:scale-95 transition-transform snooze-btn"
                               onClick={(e) => {
                                 e.stopPropagation() // Bug fix #84: Prevent card click when clicking snooze
                                 let targetDate: Date
@@ -1030,8 +1036,14 @@ export default function RemindersPage() {
                                 )
                                 setLeads(updated)
                                 localStorage.setItem('whatszap-leads-v3', JSON.stringify(updated))
-                                // Haptic feedback
-                                if ('vibrate' in navigator) navigator.vibrate(10)
+                                // Haptic feedback + visual animation
+                                if ('vibrate' in navigator) navigator.vibrate([10, 20, 10])
+                                // UX #701: Visual feedback on snooze
+                                const card = document.querySelector(`[data-reminder-id="${lead.id}"]`)
+                                if (card) {
+                                  card.classList.add('snooze-success')
+                                  setTimeout(() => card.classList.remove('snooze-success'), 600)
+                                }
                               }}
                               title={option.title}
                             >
