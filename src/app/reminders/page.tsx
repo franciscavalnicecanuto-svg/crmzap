@@ -178,6 +178,7 @@ export default function RemindersPage() {
       }
       
       // UX #700: Keyboard snooze shortcuts (1=30m, 2=1h, 3=3h, 4=tomorrow, 5=monday)
+      // Bug fix #625: Don't trigger snooze when typing in search input
       const snoozeMap: Record<string, { ms: number | 'tomorrow' | 'monday', label: string }> = {
         '1': { ms: 30 * 60 * 1000, label: '30 minutos' },
         '2': { ms: 60 * 60 * 1000, label: '1 hora' },
@@ -185,6 +186,9 @@ export default function RemindersPage() {
         '4': { ms: 'tomorrow', label: 'amanhã às 9h' },
         '5': { ms: 'monday', label: 'segunda às 9h' },
       }
+      
+      // Bug fix #625: Skip snooze shortcuts if typing in search input
+      if (document.activeElement === searchInputRef.current) return
       
       if (snoozeMap[e.key] && currentFiltered.length > 0) {
         e.preventDefault()

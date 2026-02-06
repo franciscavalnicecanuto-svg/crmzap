@@ -134,10 +134,16 @@ export default function ProfilePage() {
                   id="name"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="pl-10"
+                  className={`pl-10 ${!name.trim() ? 'border-red-300 focus-visible:ring-red-300' : ''}`}
                   placeholder="Seu nome"
                 />
               </div>
+              {/* UX #627: Show hint when name is empty */}
+              {!name.trim() && (
+                <p className="text-xs text-red-500">
+                  O nome é obrigatório
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -198,7 +204,18 @@ export default function ProfilePage() {
               <Link href="/dashboard">
                 <Button variant="outline">Cancelar</Button>
               </Link>
-              <Button onClick={handleSave} disabled={isSaving}>
+              {/* Bug fix #626: Disable save if name is empty or phone is incomplete */}
+              <Button 
+                onClick={handleSave} 
+                disabled={isSaving || !name.trim() || (phone.replace(/\D/g, '').length > 0 && phone.replace(/\D/g, '').length < 10)}
+                title={
+                  !name.trim() 
+                    ? 'Preencha o nome' 
+                    : (phone.replace(/\D/g, '').length > 0 && phone.replace(/\D/g, '').length < 10)
+                      ? 'Complete o número de telefone'
+                      : 'Salvar perfil'
+                }
+              >
                 {isSaving ? (
                   <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
