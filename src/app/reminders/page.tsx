@@ -209,9 +209,17 @@ export default function RemindersPage() {
   // Bug fix: markAsDone now records completion before clearing
   // UX #126: Added toast feedback for completed reminders
   // UX improvement: Animation on completion
+  // Bug fix #400: Safety timeout to prevent stuck completing state
+  const completingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
   const markAsDone = (leadId: string) => {
     const lead = leads.find(l => l.id === leadId)
     if (lead) {
+      // Clear any existing timeout to prevent race conditions
+      if (completingTimeoutRef.current) {
+        clearTimeout(completingTimeoutRef.current)
+      }
+      
       // Trigger completion animation
       setCompletingId(leadId)
       
@@ -231,13 +239,23 @@ export default function RemindersPage() {
       // Haptic feedback
       if ('vibrate' in navigator) navigator.vibrate([10, 30, 10])
       
-      // Delay removal for animation
-      setTimeout(() => {
+      // Delay removal for animation with safety timeout
+      completingTimeoutRef.current = setTimeout(() => {
         clearReminder(leadId)
         setCompletingId(null)
+        completingTimeoutRef.current = null
       }, 400)
     }
   }
+  
+  // Cleanup timeout on unmount to prevent memory leak
+  useEffect(() => {
+    return () => {
+      if (completingTimeoutRef.current) {
+        clearTimeout(completingTimeoutRef.current)
+      }
+    }
+  }, [])
   
   // UX #127: Bulk actions for reminders
   // Bug fix #51: Batch localStorage operations (read once, write once)
@@ -363,6 +381,33 @@ export default function RemindersPage() {
     if (date >= today && date < tomorrow) return 'today'
     return 'upcoming'
   }
+  
+  // UX #401: Get countdown for urgent reminders
+  const getCountdown = (dateStr: string): string | null => {
+    const date = new Date(dateStr)
+    const diffMs = date.getTime() - Date.now()
+    
+    if (diffMs <= 0 || diffMs > 30 * 60 * 1000) return null // Only for next 30 min
+    
+    const mins = Math.floor(diffMs / 60000)
+    const secs = Math.floor((diffMs % 60000) / 1000)
+    
+    if (mins === 0) return `${secs}s`
+    return `${mins}m ${secs.toString().padStart(2, '0')}s`
+  }
+  
+  // UX #401: Auto-update countdown every second for urgent reminders
+  const [, forceUpdate] = useState(0)
+  useEffect(() => {
+    const hasUrgent = filteredLeadsRef.current.some(l => getReminderStatus(l.reminderDate!) === 'urgent')
+    if (!hasUrgent) return
+    
+    const interval = setInterval(() => {
+      forceUpdate(n => n + 1)
+    }, 1000)
+    
+    return () => clearInterval(interval)
+  }, [filter, searchTerm, leads])
 
   const formatReminderDate = (dateStr: string) => {
     const date = new Date(dateStr)
@@ -737,14 +782,22 @@ export default function RemindersPage() {
                         </Badge>
                       </div>
                       
-                      <div className={`text-sm font-medium mb-1 ${
+                      <div className={`text-sm font-medium mb-1 flex items-center gap-2 ${
                         status === 'overdue' ? 'text-red-600' :
                         status === 'urgent' ? 'text-orange-600' :
                         status === 'today' ? 'text-amber-600' :
                         'text-blue-600'
                       }`}>
-                        {status === 'urgent' && <span className="mr-1">⚡</span>}
-                        {formatReminderDate(lead.reminderDate!)}
+                        <span>
+                          {status === 'urgent' && <span className="mr-1">⚡</span>}
+                          {formatReminderDate(lead.reminderDate!)}
+                        </span>
+                        {/* UX #401: Live countdown for urgent reminders */}
+                        {status === 'urgent' && getCountdown(lead.reminderDate!) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs font-bold animate-pulse">
+                            ⏱️ {getCountdown(lead.reminderDate!)}
+                          </span>
+                        )}
                       </div>
                       
                       {lead.reminderNote && (

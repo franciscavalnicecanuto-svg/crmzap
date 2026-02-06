@@ -1381,3 +1381,90 @@ textarea:focus::placeholder {
 .message:hover .message-timestamp {
   opacity: 1;
 }
+
+/* UX #400: Enhanced lead cooling indicator */
+@keyframes lead-cooling-pulse {
+  0%, 100% {
+    border-color: rgba(251, 191, 36, 0.4);
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+  }
+  50% {
+    border-color: rgba(251, 191, 36, 0.7);
+    box-shadow: 0 0 8px 2px rgba(251, 191, 36, 0.15);
+  }
+}
+
+.lead-cooling {
+  animation: lead-cooling-pulse 3s ease-in-out infinite;
+}
+
+/* UX #401: Urgent countdown badge animation */
+@keyframes countdown-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 0.9;
+  }
+}
+
+.countdown-badge {
+  animation: countdown-pulse 1s ease-in-out infinite;
+  font-variant-numeric: tabular-nums;
+}
+
+/* UX #402: Card just moved animation */
+@keyframes lead-just-moved {
+  0% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.5);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: none;
+  }
+}
+
+.lead-just-moved {
+  animation: lead-just-moved 0.4s ease-out;
+}
+
+/* UX #403: Empty column bounce on drag over */
+@keyframes empty-column-bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+.empty-column-animate {
+  animation: empty-column-bounce 0.8s ease-in-out infinite;
+}
+
+/* UX #404: Enhanced cooling badge glow */
+@keyframes cooling-badge-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(251, 191, 36, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.7);
+  }
+}
+
+.cooling-badge {
+  animation: cooling-badge-glow 2s ease-in-out infinite;
+}
+
+/* UX #405: Better focus ring for keyboard navigation */
+@keyframes keyboard-nav-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.2);
+  }
+}
+
+.keyboard-nav-focused {
+  animation: keyboard-nav-pulse 1.5s ease-in-out infinite;
+}
