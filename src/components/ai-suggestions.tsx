@@ -147,10 +147,12 @@ export function AISuggestions({ messages, leadName, onSelectSuggestion }: AISugg
         if (response.status === 429) {
           // Bug fix #86: Set cooldown on rate limit
           // Bug fix #110: Ensure previous interval is cleared before creating new one
+          // Bug fix #653: Clear old suggestions on rate limit to avoid confusion
           if (cooldownIntervalRef.current) {
             clearInterval(cooldownIntervalRef.current)
             cooldownIntervalRef.current = null
           }
+          setSuggestions([]) // Clear old suggestions during cooldown
           setCooldown(30)
           cooldownIntervalRef.current = setInterval(() => {
             setCooldown(prev => {
