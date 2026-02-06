@@ -750,10 +750,15 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   const canAnalyze = lead && !['fechado', 'perdido'].includes(lead.status || '')
 
   // UX #110: Improved empty state with helpful tips when no lead is selected
+  // UX #171: Enhanced accessibility with ARIA live regions
   if (!lead) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-center p-6 bg-gradient-to-b from-transparent to-green-50/20">
-        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-4 animate-pulse">
+      <div 
+        className="h-full flex flex-col items-center justify-center text-center p-6 bg-gradient-to-b from-transparent to-green-50/20"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-4 empty-state-glow">
           <MessageCircle className="w-10 h-10 text-green-500" />
         </div>
         <h3 className="font-semibold text-base mb-2">Selecione uma conversa</h3>
@@ -762,20 +767,20 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
         </p>
         <div className="space-y-2 text-xs text-muted-foreground max-w-[200px]">
           <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
-            <span className="text-lg">💡</span>
+            <span className="text-lg" aria-hidden="true">💡</span>
             <span>Arraste cards para mudar o status do lead</span>
           </div>
           <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
-            <span className="text-lg">🔔</span>
+            <span className="text-lg" aria-hidden="true">🔔</span>
             <span>Crie lembretes para não esquecer follow-ups</span>
           </div>
           <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-lg">
-            <span className="text-lg">🤖</span>
+            <span className="text-lg" aria-hidden="true">🤖</span>
             <span>Use a IA para analisar conversas</span>
           </div>
         </div>
         <p className="mt-6 text-[10px] text-muted-foreground/50">
-          Atalho: Ctrl+K para buscar leads
+          Atalho: <kbd className="px-1 py-0.5 bg-muted rounded text-[9px] font-mono">Ctrl+K</kbd> para buscar leads
         </p>
       </div>
     )
@@ -1279,10 +1284,19 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
 
       {/* Input - UX #67: Improved with multiline support and character counter */}
       {/* UX #132: Show offline warning when not connected */}
+      {/* UX #172: Enhanced offline state with reconnection info */}
       {!isConnected && (
         <div className="px-3 py-2 bg-amber-50 border-t border-amber-200 flex items-center gap-2 text-amber-700 text-xs animate-in fade-in-0 duration-200">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          <span className="flex-1">Modo offline. Mensagens serão enviadas quando reconectar.</span>
+          <div className="relative">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full animate-ping" />
+          </div>
+          <span className="flex-1">
+            Modo offline. Mensagens serão enviadas quando reconectar.
+            <a href="/connect" className="ml-1 underline hover:text-amber-900 font-medium">
+              Reconectar →
+            </a>
+          </span>
         </div>
       )}
       <div className="p-3 border-t">

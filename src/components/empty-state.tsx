@@ -90,13 +90,14 @@ export function EmptyState({ type, onAction, actionLabel, secondaryAction, secon
   return (
     <div className="flex flex-col items-center justify-center p-8 text-center animate-in fade-in-0 slide-in-from-bottom-4 duration-300">
       {/* Illustrated Icon - UX #94: Removed aggressive pulse animation */}
-      <div className={`relative w-24 h-24 rounded-full bg-gradient-to-br ${config.gradient} flex items-center justify-center mb-5`}>
+      {/* UX #173: Enhanced empty state with subtle glow effect */}
+      <div className={`relative w-24 h-24 rounded-full bg-gradient-to-br ${config.gradient} flex items-center justify-center mb-5 empty-state-glow`}>
         <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/20 to-transparent" />
         <div className="w-16 h-16 rounded-full bg-background/90 flex items-center justify-center shadow-lg backdrop-blur-sm">
-          <Icon className="w-8 h-8 text-muted-foreground" />
+          <Icon className="w-8 h-8 text-muted-foreground" aria-hidden="true" />
         </div>
-        {/* Decorative dots */}
-        <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-400 animate-ping" />
+        {/* Decorative dots - UX #173: Reduced motion for accessibility */}
+        <div className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-green-400 motion-safe:animate-ping" />
         <div className="absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full bg-blue-400" />
       </div>
       

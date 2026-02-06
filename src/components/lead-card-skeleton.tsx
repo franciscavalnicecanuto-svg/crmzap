@@ -2,26 +2,27 @@
 
 import { Skeleton } from '@/components/ui/skeleton'
 
+// UX #174: Enhanced skeleton with shimmer animation
 export function LeadCardSkeleton() {
   return (
-    <div className="p-2 rounded-lg border bg-card">
+    <div className="p-2 rounded-lg border bg-card animate-in fade-in-0 duration-300">
       <div className="flex items-start gap-2">
         {/* Avatar */}
-        <Skeleton className="w-8 h-8 rounded-full flex-shrink-0" />
+        <Skeleton className="w-8 h-8 rounded-full flex-shrink-0 skeleton-animate" />
         
         <div className="flex-1 min-w-0">
           {/* Name */}
-          <Skeleton className="h-3.5 w-24 mb-1" />
+          <Skeleton className="h-3.5 w-24 mb-1 skeleton-animate" />
           {/* Last message */}
-          <Skeleton className="h-3 w-full mb-1" />
-          <Skeleton className="h-3 w-2/3" />
+          <Skeleton className="h-3 w-full mb-1 skeleton-animate" />
+          <Skeleton className="h-3 w-2/3 skeleton-animate" />
         </div>
       </div>
       
       {/* Tags placeholder */}
       <div className="flex gap-1 mt-2">
-        <Skeleton className="h-4 w-12 rounded" />
-        <Skeleton className="h-4 w-10 rounded" />
+        <Skeleton className="h-4 w-12 rounded skeleton-animate" />
+        <Skeleton className="h-4 w-10 rounded skeleton-animate" />
       </div>
     </div>
   )

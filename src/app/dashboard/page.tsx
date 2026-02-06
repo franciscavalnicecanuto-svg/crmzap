@@ -1378,6 +1378,7 @@ function DashboardContent() {
             </div>
             
             {/* Bug fix #12: Campo de busca melhorado com botão de limpar + UX #50: Keyboard shortcut */}
+            {/* UX #170: Search results count indicator */}
             <div className="flex-1 max-w-xs">
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
@@ -1390,13 +1391,25 @@ function DashboardContent() {
                   aria-label="Buscar leads (Ctrl+K)"
                 />
                 {search && (
-                  <button
-                    onClick={() => setSearch('')}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center"
-                    aria-label="Limpar busca"
-                  >
-                    <X className="w-3 h-3 text-muted-foreground" />
-                  </button>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                    {/* UX #170: Show result count while searching */}
+                    {debouncedSearch.trim() && (
+                      <span className={`text-[9px] font-medium px-1 rounded ${
+                        filteredLeads.length === 0 
+                          ? 'text-red-500' 
+                          : 'text-green-600'
+                      }`}>
+                        {filteredLeads.length}
+                      </span>
+                    )}
+                    <button
+                      onClick={() => setSearch('')}
+                      className="w-4 h-4 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center"
+                      aria-label="Limpar busca"
+                    >
+                      <X className="w-3 h-3 text-muted-foreground" />
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

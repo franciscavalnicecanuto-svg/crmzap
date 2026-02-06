@@ -200,6 +200,100 @@
   }
 }
 
+/* UX #162: Message sent flash animation */
+@keyframes message-sent-flash {
+  0% {
+    background-color: rgba(34, 197, 94, 0.4);
+    transform: scale(1.02);
+  }
+  100% {
+    background-color: transparent;
+    transform: scale(1);
+  }
+}
+
+.message-sent-flash {
+  animation: message-sent-flash 0.5s ease-out;
+}
+
+/* UX #163: Mobile keyboard viewport fix */
+@supports (height: 100dvh) {
+  .h-screen {
+    height: 100dvh;
+  }
+}
+
+/* UX #164: Improved focus ring for accessibility */
+*:focus-visible {
+  outline: 2px solid oklch(0.55 0.18 145);
+  outline-offset: 2px;
+}
+
+/* UX #165: Better touch target for mobile */
+@media (hover: none) and (pointer: coarse) {
+  button, a, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Exception for small badges and icons */
+  .badge, .icon-button-sm {
+    min-height: unset;
+    min-width: unset;
+  }
+}
+
+/* UX #166: Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* UX #167: Better selection colors */
+::selection {
+  background-color: oklch(0.55 0.18 145 / 0.3);
+  color: inherit;
+}
+
+/* UX #168: Skeleton loading animation improvements */
+@keyframes skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-animate {
+  background: linear-gradient(
+    90deg,
+    oklch(0.9 0.01 240) 25%,
+    oklch(0.85 0.01 240) 50%,
+    oklch(0.9 0.01 240) 75%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-loading 1.5s ease-in-out infinite;
+}
+
+/* UX #169: Improved empty state illustration */
+.empty-state-glow {
+  box-shadow: 
+    0 0 40px oklch(0.55 0.18 145 / 0.1),
+    0 0 80px oklch(0.55 0.18 145 / 0.05);
+}
+
 .message-sending {
   animation: sending-pulse 1s ease-in-out infinite;
 }
