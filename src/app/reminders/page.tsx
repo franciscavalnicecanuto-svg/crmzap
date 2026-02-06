@@ -342,6 +342,33 @@ export default function RemindersPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2">
+                      {/* UX #78: Quick Snooze dropdown for passed reminders */}
+                      {status === 'overdue' && (
+                        <div className="flex items-center gap-1">
+                          {[
+                            { label: '1h', ms: 60 * 60 * 1000 },
+                            { label: '3h', ms: 3 * 60 * 60 * 1000 },
+                          ].map((option) => (
+                            <Button
+                              key={option.label}
+                              variant="ghost"
+                              size="sm"
+                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 h-7 text-xs"
+                              onClick={() => {
+                                const newDate = new Date(Date.now() + option.ms).toISOString()
+                                const updated = leads.map(l => 
+                                  l.id === lead.id ? { ...l, reminderDate: newDate } : l
+                                )
+                                setLeads(updated)
+                                localStorage.setItem('whatszap-leads-v3', JSON.stringify(updated))
+                              }}
+                              title={`Adiar ${option.label}`}
+                            >
+                              +{option.label}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
                       <Button 
                         variant="ghost" 
                         size="sm"

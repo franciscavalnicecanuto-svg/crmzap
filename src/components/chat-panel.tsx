@@ -521,6 +521,45 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
     const date = new Date(timestamp)
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   }
+  
+  // UX #77: Format date for day separators
+  const formatDateSeparator = (timestamp: string) => {
+    const date = new Date(timestamp)
+    const today = new Date()
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
+    
+    if (date.toDateString() === today.toDateString()) {
+      return 'Hoje'
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return 'Ontem'
+    } else {
+      return date.toLocaleDateString('pt-BR', { 
+        day: '2-digit', 
+        month: '2-digit',
+        year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined
+      })
+    }
+  }
+  
+  // UX #77: Group messages by date
+  const getMessagesByDate = (messages: Message[]) => {
+    const groups: { date: string; messages: Message[] }[] = []
+    let currentDate = ''
+    
+    for (const msg of messages) {
+      const msgDate = msg.timestamp ? new Date(msg.timestamp).toDateString() : 'unknown'
+      
+      if (msgDate !== currentDate) {
+        currentDate = msgDate
+        groups.push({ date: msg.timestamp || '', messages: [msg] })
+      } else {
+        groups[groups.length - 1].messages.push(msg)
+      }
+    }
+    
+    return groups
+  }
 
   // Check if analysis should be available (not in final stages)
   const canAnalyze = lead && !['fechado', 'perdido'].includes(lead.status || '')
@@ -790,27 +829,65 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
             </Button>
           </div>
         ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            Nenhuma mensagem ainda. Envie a primeira!
+          // UX #69: Improved empty state with conversation starters
+          <div className="flex flex-col items-center justify-center h-full text-center p-6">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+              <Send className="w-7 h-7 text-green-500" />
+            </div>
+            <h3 className="font-medium text-base mb-1">Iniciar conversa</h3>
+            <p className="text-muted-foreground text-sm mb-4 max-w-[200px]">
+              Seja o primeiro a enviar uma mensagem para {lead?.name?.split(' ')[0] || 'este contato'}
+            </p>
+            <div className="flex flex-wrap gap-2 justify-center max-w-[280px]">
+              {[
+                '👋 Olá! Tudo bem?',
+                '📞 Posso te ligar?',
+                '❓ Posso ajudar?'
+              ].map((starter, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setNewMessage(starter)}
+                  className="px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-full text-xs transition-colors border border-green-200"
+                >
+                  {starter}
+                </button>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="space-y-2">
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'} animate-in fade-in-0 slide-in-from-bottom-2 duration-200`}
-              >
-                <div
-                  className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
-                    msg.fromMe
-                      ? 'bg-green-500 text-white'
-                      : 'bg-muted'
-                  }`}
-                >
-                  {renderMessageContent(msg.text, msg.fromMe)}
-                  <p className={`text-[10px] mt-1 ${msg.fromMe ? 'text-green-100' : 'text-muted-foreground'}`}>
-                    {formatTime(msg.timestamp)}
-                  </p>
+            {/* UX #77: Messages grouped by date with separators */}
+            {getMessagesByDate(messages).map((group, groupIdx) => (
+              <div key={group.date || groupIdx}>
+                {/* Date separator */}
+                {group.date && (
+                  <div className="flex items-center justify-center my-3">
+                    <div className="px-3 py-1 bg-muted/60 rounded-full text-[10px] text-muted-foreground font-medium">
+                      {formatDateSeparator(group.date)}
+                    </div>
+                  </div>
+                )}
+                {/* Messages for this date */}
+                <div className="space-y-2">
+                  {group.messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'} animate-in fade-in-0 slide-in-from-bottom-2 duration-200`}
+                    >
+                      <div
+                        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                          msg.fromMe
+                            ? 'bg-green-500 text-white'
+                            : 'bg-muted'
+                        }`}
+                      >
+                        {renderMessageContent(msg.text, msg.fromMe)}
+                        <p className={`text-[10px] mt-1 ${msg.fromMe ? 'text-green-100' : 'text-muted-foreground'}`}>
+                          {formatTime(msg.timestamp)}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ))}
@@ -831,27 +908,32 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
       </div>
 
       {/* Quick Replies - Bug fix #23: Only show when connected */}
+      {/* UX #70: Improved quick replies with better visual feedback and keyboard accessibility */}
       {lead && messages.length > 0 && isConnected && (
-        <div className="px-3 pt-2 border-t bg-gray-50/50">
+        <div className="px-3 pt-2 border-t bg-gradient-to-r from-gray-50/80 to-green-50/30">
           <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
             {[
-              { emoji: '👋', text: 'Olá! Tudo bem?' },
-              { emoji: '⏰', text: 'Um momento, por favor' },
-              { emoji: '✅', text: 'Perfeito!' },
-              { emoji: '📞', text: 'Posso te ligar?' },
-              { emoji: '📅', text: 'Podemos agendar?' },
-              { emoji: '💰', text: 'Vou verificar os valores' },
-              { emoji: '🙏', text: 'Obrigado pelo contato!' },
+              { emoji: '👋', text: 'Olá! Tudo bem?', shortcut: '1' },
+              { emoji: '⏰', text: 'Um momento, por favor', shortcut: '2' },
+              { emoji: '✅', text: 'Perfeito!', shortcut: '3' },
+              { emoji: '📞', text: 'Posso te ligar?', shortcut: '4' },
+              { emoji: '📅', text: 'Podemos agendar?', shortcut: '5' },
+              { emoji: '💰', text: 'Vou verificar os valores', shortcut: '6' },
+              { emoji: '🙏', text: 'Obrigado pelo contato!', shortcut: '7' },
             ].map((reply, idx) => (
               <Button
                 key={idx}
                 variant="outline"
                 size="sm"
-                className="h-7 px-2 text-xs whitespace-nowrap shrink-0 hover:bg-green-50 hover:border-green-300 hover:text-green-700 transition-colors"
+                className="h-7 px-2.5 text-xs whitespace-nowrap shrink-0 hover:bg-green-100 hover:border-green-400 hover:text-green-800 hover:shadow-sm active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:ring-offset-1"
                 onClick={() => {
                   setNewMessage(reply.text)
+                  // UX: Haptic feedback
+                  if ('vibrate' in navigator) navigator.vibrate(10)
                 }}
                 disabled={isSending}
+                title={`${reply.text} (Alt+${reply.shortcut})`}
+                aria-label={`Resposta rápida: ${reply.text}`}
               >
                 <span className="mr-1">{reply.emoji}</span>
                 {reply.text}

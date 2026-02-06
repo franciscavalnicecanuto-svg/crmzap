@@ -97,6 +97,28 @@ const TAG_OPTIONS = [
   { label: 'VIP', category: 'tipo', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30' },
 ]
 
+// UX #71: Relative time helper for "last message X ago"
+// Bug fix #73: Handle future dates gracefully (timezone issues, clock skew)
+const getRelativeTime = (dateStr: string | undefined): string | null => {
+  if (!dateStr) return null
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  
+  // Bug fix #73: If date is in the future (clock skew, timezone), show nothing
+  if (diffMs < 0) return null
+  
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+  
+  if (diffMins < 1) return 'agora'
+  if (diffMins < 60) return `${diffMins}m`
+  if (diffHours < 24) return `${diffHours}h`
+  if (diffDays < 7) return `${diffDays}d`
+  return null // Don't show if older than a week
+}
+
 const getTagColor = (tag: string) => {
   const found = TAG_OPTIONS.find(t => t.label === tag)
   return found?.color || 'bg-gray-500/20 text-gray-400 border-gray-500/30'
@@ -308,7 +330,8 @@ function DashboardContent() {
       const updatedLead = leads.find(l => l.id === selectedLead.id)
       if (updatedLead) {
         // Helper to normalize tags for comparison (undefined and [] are equivalent)
-        const normalizeTags = (tags: string[] | undefined) => (tags || []).sort().join(',')
+        // Bug fix #49: Use spread to avoid mutating original array (sort() modifies in-place)
+        const normalizeTags = (tags: string[] | undefined) => [...(tags || [])].sort().join(',')
         
         // Bug fix #37: Include name in comparison (Evolution API may update contact names)
         // Only update if any field actually changed
@@ -458,12 +481,22 @@ function DashboardContent() {
       }
     }
     // Load custom kanban columns
+    // Bug fix #74: Safe parsing with structure validation
     const savedColumns = localStorage.getItem('whatszap-kanban-columns')
     if (savedColumns) {
       try {
-        setKanbanColumns(JSON.parse(savedColumns))
+        const parsed = JSON.parse(savedColumns)
+        // Validate structure: must be array with id, label, visible
+        if (Array.isArray(parsed) && parsed.length > 0 && 
+            parsed.every(col => col.id && col.label && typeof col.visible === 'boolean')) {
+          setKanbanColumns(parsed)
+        } else {
+          console.warn('Invalid kanban columns format, using defaults')
+          localStorage.setItem('whatszap-kanban-columns', JSON.stringify(defaultKanbanColumns))
+        }
       } catch (e) {
         console.error('Failed to parse kanban columns:', e)
+        localStorage.setItem('whatszap-kanban-columns', JSON.stringify(defaultKanbanColumns))
       }
     }
     
@@ -820,6 +853,7 @@ function DashboardContent() {
 
   const [draggedLead, setDraggedLead] = useState<string | null>(null)
   const [showDeleteZone, setShowDeleteZone] = useState(false)
+  const [dragOverColumn, setDragOverColumn] = useState<LeadStatus | null>(null) // UX #72: Visual feedback on drag over
   
   // Mobile: apenas onClick funciona (sem touch drag por enquanto)
 
@@ -863,6 +897,7 @@ function DashboardContent() {
   const handleDragEnd = () => {
     setDraggedLead(null)
     setShowDeleteZone(false)
+    setDragOverColumn(null) // UX #72: Clear highlight on drag end
   }
 
   const handleDropDelete = (e: React.DragEvent) => {
@@ -881,10 +916,23 @@ function DashboardContent() {
     e.preventDefault()
     const leadId = e.dataTransfer.getData('leadId')
     moveLead(leadId, status)
+    setDragOverColumn(null) // UX #72: Clear highlight on drop
   }
 
-  const handleDragOver = (e: React.DragEvent) => {
+  // UX #72: Enhanced drag over with column tracking
+  const handleDragOver = (e: React.DragEvent, status?: LeadStatus) => {
     e.preventDefault()
+    if (status && dragOverColumn !== status) {
+      setDragOverColumn(status)
+    }
+  }
+  
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear if leaving the column entirely (not entering a child)
+    const relatedTarget = e.relatedTarget as HTMLElement
+    if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
+      setDragOverColumn(null)
+    }
   }
 
   const handleCardClick = (lead: Lead) => {
@@ -1544,12 +1592,20 @@ function DashboardContent() {
                 return (
                   <div 
                     key={status}
-                    className="flex-shrink-0 w-40 flex flex-col"
+                    className={`flex-shrink-0 w-40 flex flex-col transition-all duration-150 ${
+                      dragOverColumn === status ? 'scale-[1.02] opacity-100' : draggedLead ? 'opacity-70' : ''
+                    }`}
                     data-status={status}
-                    onDragOver={handleDragOver}
+                    onDragOver={(e) => handleDragOver(e, status)}
+                    onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, status)}
                   >
-                    <div className={`rounded-md border ${column.bgColor} p-1.5 mb-1`}>
+                    {/* UX #72: Enhanced column header with drag highlight */}
+                    <div className={`rounded-md border p-1.5 mb-1 transition-all ${
+                      dragOverColumn === status 
+                        ? 'ring-2 ring-green-400 shadow-lg border-green-300 bg-green-50' 
+                        : column.bgColor
+                    }`}>
                       <div className="flex items-center gap-1">
                         <span className={`font-semibold text-xs ${column.color}`}>{column.label}</span>
                         <Badge variant="secondary" className="text-[10px] h-4 px-1">
@@ -1631,9 +1687,17 @@ function DashboardContent() {
                                     )}
                                   </div>
                                   {!settings.compactView && (
-                                    <p className={`text-[9px] truncate ${
-                                      hasUnread ? 'text-green-700' : 'text-muted-foreground'
-                                    }`}>{lead.lastMessage || lead.phone}</p>
+                                    <div className="flex items-center gap-1">
+                                      <p className={`text-[9px] truncate flex-1 ${
+                                        hasUnread ? 'text-green-700' : 'text-muted-foreground'
+                                      }`}>{lead.lastMessage || lead.phone}</p>
+                                      {/* UX #71: Relative time indicator */}
+                                      {lead.createdAt && getRelativeTime(lead.createdAt) && (
+                                        <span className="text-[8px] text-muted-foreground/60 whitespace-nowrap">
+                                          {getRelativeTime(lead.createdAt)}
+                                        </span>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -2021,15 +2085,54 @@ function DashboardContent() {
                 <X className="w-4 h-4" />
               </button>
             </div>
+            
+            {/* UX #75: Quick Snooze Buttons */}
+            <div className="mb-3">
+              <label className="text-xs text-muted-foreground mb-1.5 block">⚡ Atalhos rápidos</label>
+              <div className="flex gap-1.5">
+                {[
+                  { label: '15min', ms: 15 * 60 * 1000 },
+                  { label: '1h', ms: 60 * 60 * 1000 },
+                  { label: '3h', ms: 3 * 60 * 60 * 1000 },
+                  { label: 'Amanhã 9h', ms: 'tomorrow' as const },
+                ].map((option) => (
+                  <button
+                    key={option.label}
+                    onClick={() => {
+                      let targetDate: Date
+                      if (option.ms === 'tomorrow') {
+                        targetDate = new Date()
+                        targetDate.setDate(targetDate.getDate() + 1)
+                        targetDate.setHours(9, 0, 0, 0)
+                      } else {
+                        targetDate = new Date(Date.now() + option.ms)
+                      }
+                      const year = targetDate.getFullYear()
+                      const month = String(targetDate.getMonth() + 1).padStart(2, '0')
+                      const day = String(targetDate.getDate()).padStart(2, '0')
+                      const hours = String(targetDate.getHours()).padStart(2, '0')
+                      const minutes = String(targetDate.getMinutes()).padStart(2, '0')
+                      setReminderDate(`${year}-${month}-${day}T${hours}:${minutes}`)
+                      // Haptic feedback
+                      if ('vibrate' in navigator) navigator.vibrate(10)
+                    }}
+                    className="flex-1 px-2 py-1.5 text-xs rounded border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-300 transition-all active:scale-95"
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
             <div className="space-y-3">
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Data e hora</label>
+                <label className="text-xs text-muted-foreground mb-1 block">Ou escolha data e hora</label>
                 <Input
                   type="datetime-local"
                   value={reminderDate}
                   onChange={e => setReminderDate(e.target.value)}
                   min={(() => {
-                    // Bug fix #40: Use local time for min (not UTC like toISOString does)
+                    // Bug fix #40 & #76: Use local time and recalculate on each render
                     const minDate = new Date(Date.now() + 5 * 60 * 1000)
                     const year = minDate.getFullYear()
                     const month = String(minDate.getMonth() + 1).padStart(2, '0')
