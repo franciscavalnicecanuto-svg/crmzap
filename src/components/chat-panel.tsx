@@ -1144,6 +1144,13 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
       )}
 
       {/* Input - UX #67: Improved with multiline support and character counter */}
+      {/* UX #132: Show offline warning when not connected */}
+      {!isConnected && (
+        <div className="px-3 py-2 bg-amber-50 border-t border-amber-200 flex items-center gap-2 text-amber-700 text-xs animate-in fade-in-0 duration-200">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span className="flex-1">Modo offline. Mensagens serão enviadas quando reconectar.</span>
+        </div>
+      )}
       <div className="p-3 border-t">
         {sendError && (
           <div className="mb-2 px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-600 animate-in fade-in-0 duration-200">

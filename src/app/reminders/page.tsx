@@ -334,6 +334,26 @@ export default function RemindersPage() {
           />
         </div>
 
+        {/* UX #131: Quick create reminder section */}
+        {leadsWithReminders.length > 0 && (
+          <div className="mb-6 p-4 border border-dashed border-amber-300 rounded-lg bg-amber-50/30 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-amber-100 rounded-full">
+                <Bell className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Precisa lembrar de algo?</p>
+                <p className="text-xs text-muted-foreground">Crie lembretes no dashboard clicando no sino em qualquer lead</p>
+              </div>
+            </div>
+            <Link href="/dashboard">
+              <Button variant="outline" size="sm" className="border-amber-300 text-amber-700 hover:bg-amber-100">
+                Ir para Dashboard
+              </Button>
+            </Link>
+          </div>
+        )}
+
         {/* Reminders List */}
         {filteredLeads.length === 0 ? (
           <div className="text-center py-16">

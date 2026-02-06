@@ -10,7 +10,8 @@ import {
   MoreVertical,
   X,
   Clock,
-  MessageCircle
+  MessageCircle,
+  Plus
 } from 'lucide-react'
 
 interface QuickAction {
@@ -29,6 +30,7 @@ interface QuickActionsMenuProps {
 }
 
 const QUICK_ACTIONS: QuickAction[] = [
+  { id: 'send_quick', icon: MessageCircle, label: 'Enviar mensagem', color: 'text-green-600' },
   { id: 'mark_read', icon: Check, label: 'Marcar como lido', color: 'text-green-600' },
   { id: 'add_tag', icon: Tag, label: 'Adicionar tag', color: 'text-blue-600' },
   { id: 'add_reminder', icon: Bell, label: 'Criar lembrete', color: 'text-amber-600' },
@@ -102,19 +104,20 @@ export function QuickActionsMenu({
 
       {isOpen && (
         <div 
-          className="absolute right-0 top-full mt-1 z-50 bg-background rounded-lg shadow-lg border py-1 min-w-[160px] animate-in fade-in-0 zoom-in-95 duration-150"
+          className="absolute right-0 top-full mt-1 z-50 bg-background rounded-lg shadow-lg border py-1 min-w-[180px] animate-in fade-in-0 zoom-in-95 duration-150"
           onClick={(e) => e.stopPropagation()}
         >
           {availableActions.map((action) => (
             <button
               key={action.id}
               onClick={() => handleAction(action.id)}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted/50 transition-colors ${
+              className={`w-full flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted/50 transition-colors active:bg-muted active:scale-[0.98] touch-manipulation ${
                 action.dangerous ? 'text-red-600 hover:bg-red-50' : ''
               }`}
+              style={{ minHeight: '44px' }} // UX #129: Minimum touch target size per WCAG
             >
-              <action.icon className={`w-4 h-4 ${action.color || ''}`} />
-              <span>{action.label}</span>
+              <action.icon className={`w-5 h-5 ${action.color || ''}`} />
+              <span className="font-medium">{action.label}</span>
             </button>
           ))}
         </div>
@@ -188,56 +191,86 @@ export function useLongPress(
 /**
  * Floating Action Button for Mobile
  * Shows quick actions as a FAB
+ * UX #130: Enhanced with more useful actions and better visual feedback
  */
 export function MobileQuickActionsFAB({
   onNewLead,
   onSync,
+  onOpenReminders,
+  onOpenSearch,
   className = ''
 }: {
   onNewLead?: () => void
   onSync?: () => void
+  onOpenReminders?: () => void
+  onOpenSearch?: () => void
   className?: string
 }) {
   const [isExpanded, setIsExpanded] = useState(false)
 
+  // Close when clicking outside
+  useEffect(() => {
+    if (!isExpanded) return
+    const handleClick = () => setIsExpanded(false)
+    const timer = setTimeout(() => {
+      document.addEventListener('click', handleClick)
+    }, 100)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('click', handleClick)
+    }
+  }, [isExpanded])
+
+  const actions = [
+    { onClick: onOpenSearch, icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>, label: 'Buscar', color: 'bg-gray-600' },
+    { onClick: onOpenReminders, icon: <Bell className="w-5 h-5" />, label: 'Lembretes', color: 'bg-amber-500' },
+    { onClick: onSync, icon: <Clock className="w-5 h-5" />, label: 'Sincronizar', color: 'bg-blue-500' },
+    { onClick: onNewLead, icon: <MessageCircle className="w-5 h-5" />, label: 'Novo lead', color: 'bg-green-500' },
+  ].filter(a => a.onClick)
+
   return (
-    <div className={`fixed bottom-20 right-4 z-40 md:hidden ${className}`}>
-      {/* Expanded Actions */}
+    <div className={`fixed bottom-20 right-4 z-40 md:hidden ${className}`} onClick={(e) => e.stopPropagation()}>
+      {/* Backdrop when expanded */}
       {isExpanded && (
-        <div className="absolute bottom-14 right-0 flex flex-col gap-2 animate-in fade-in-0 slide-in-from-bottom-4 duration-200">
-          {onSync && (
-            <button
-              onClick={() => { onSync(); setIsExpanded(false) }}
-              className="w-12 h-12 rounded-full bg-blue-500 text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform"
-              aria-label="Sincronizar"
-            >
-              <Clock className="w-5 h-5" />
-            </button>
-          )}
-          {onNewLead && (
-            <button
-              onClick={() => { onNewLead(); setIsExpanded(false) }}
-              className="w-12 h-12 rounded-full bg-green-500 text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform"
-              aria-label="Novo lead"
-            >
-              <MessageCircle className="w-5 h-5" />
-            </button>
-          )}
+        <div 
+          className="fixed inset-0 bg-black/20 -z-10 animate-in fade-in-0 duration-200"
+          onClick={() => setIsExpanded(false)}
+        />
+      )}
+      
+      {/* Expanded Actions with labels */}
+      {isExpanded && (
+        <div className="absolute bottom-16 right-0 flex flex-col gap-3 animate-in fade-in-0 slide-in-from-bottom-4 duration-200">
+          {actions.map((action, idx) => (
+            <div key={idx} className="flex items-center gap-3 justify-end">
+              <span className="bg-gray-900/90 text-white text-xs font-medium px-3 py-1.5 rounded-lg shadow-lg whitespace-nowrap">
+                {action.label}
+              </span>
+              <button
+                onClick={() => { action.onClick?.(); setIsExpanded(false); if ('vibrate' in navigator) navigator.vibrate(10) }}
+                className={`w-12 h-12 rounded-full ${action.color} text-white shadow-lg flex items-center justify-center active:scale-95 transition-transform touch-manipulation`}
+                aria-label={action.label}
+              >
+                {action.icon}
+              </button>
+            </div>
+          ))}
         </div>
       )}
 
       {/* Main FAB */}
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className={`w-14 h-14 rounded-full bg-green-600 text-white shadow-xl flex items-center justify-center active:scale-95 transition-all ${
-          isExpanded ? 'rotate-45 bg-gray-600' : ''
+        onClick={() => { setIsExpanded(!isExpanded); if ('vibrate' in navigator) navigator.vibrate(10) }}
+        className={`w-14 h-14 rounded-full shadow-xl flex items-center justify-center active:scale-95 transition-all touch-manipulation ${
+          isExpanded ? 'rotate-45 bg-gray-700' : 'bg-green-600'
         }`}
         aria-label={isExpanded ? 'Fechar' : 'Ações rápidas'}
+        aria-expanded={isExpanded}
       >
         {isExpanded ? (
-          <X className="w-6 h-6" />
+          <X className="w-6 h-6 text-white" />
         ) : (
-          <MoreVertical className="w-6 h-6" />
+          <Plus className="w-7 h-7 text-white" />
         )}
       </button>
     </div>
