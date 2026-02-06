@@ -14,6 +14,7 @@
 - `src/app/globals.css`
 - `src/app/connect/page.tsx`
 - `src/components/empty-state.tsx`
+- `src/components/keyboard-shortcuts.tsx`
 
 ---
 
@@ -91,9 +92,33 @@
 - Clique no mesmo botão inverte a direção
 **Commit:** `9a97ae2`
 
+#### UX #600: Typing dots animados no empty state do chat
+**Arquivo:** `src/components/chat-panel.tsx`
+**Descrição:**
+- Indicador de typing animado no empty state
+- 3 dots com animação bounce staggered
+- Melhora visual do estado "selecione uma conversa"
+**Commit:** `5d2a022`
+
+#### UX #602: Atalho Ctrl+Shift+U para marcar como não lida
+**Arquivo:** `src/app/dashboard/page.tsx`
+**Descrição:**
+- Novo atalho para marcar conversa como não lida
+- Feedback visual com toast
+- Haptic feedback no mobile
+**Commit:** `5d2a022`
+
+#### UX #603: Lista de atalhos atualizada
+**Arquivo:** `src/components/keyboard-shortcuts.tsx`
+**Descrição:**
+- Adicionados atalhos: v (VIP), u (Urgente), c (Copiar), w (WhatsApp)
+- Novo atalho Ctrl+Shift+U documentado
+- Seção "Lead Selecionado" expandida
+**Commit:** `5d2a022`
+
 ---
 
-### 💅 CSS Animations (8 novas)
+### 💅 CSS Animations (8+ novas)
 
 **Arquivo:** `src/app/globals.css`
 **Commit:** `3144513`
@@ -116,15 +141,15 @@
 | Categoria | Quantidade |
 |-----------|------------|
 | Bugs Corrigidos | 2 |
-| Melhorias UX | 7 |
-| Animações CSS | 8 |
-| Commits | 6 |
+| Melhorias UX | 10 |
+| Animações CSS | 8+ |
+| Commits | 7 |
 
 ---
 
 ## 🚀 Deploy
 
-**Status:** Em andamento
+**Status:** ✅ Build passou - Deploy em andamento
 **Branch:** main
 **Commits:**
 - `7907ff3` - Bug fix textarea + UX copiar conversa
@@ -133,7 +158,8 @@
 - `3144513` - CSS animations
 - `7121a05` - Fix memory leak + UX conexão
 - `9a97ae2` - UX ordenação lembretes
+- `5d2a022` - Typing dots + atalho Ctrl+Shift+U + keyboard shortcuts
 
 ---
 
-*Última atualização: 2026-02-06 13:40*
+*Última atualização: 2026-02-06 13:45*
