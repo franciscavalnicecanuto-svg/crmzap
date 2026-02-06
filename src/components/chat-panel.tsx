@@ -634,6 +634,15 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   const sendMessage = async () => {
     // Bug fix #15: Prevent double sends from rapid key presses
     if (!lead || !newMessage.trim() || isSendingRef.current) return
+    
+    // Bug fix #292: Validate message content (not just whitespace/zero-width chars)
+    const cleanedMessage = newMessage.trim().replace(/[\u200B-\u200D\uFEFF]/g, '')
+    if (!cleanedMessage) {
+      setSendError('Mensagem vazia ou contém apenas espaços')
+      setTimeout(() => setSendError(null), 3000)
+      return
+    }
+    
     isSendingRef.current = true
 
     setIsSending(true)
@@ -716,13 +725,32 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   }, [])
   
   // UX #201: Handle long press for mobile context menu
+  // UX #290: Double-tap to copy on mobile (faster than long press)
   const longPressTimerRef = useRef<NodeJS.Timeout | null>(null)
-  const handleMessageTouchStart = useCallback((messageId: string) => {
+  const lastTapRef = useRef<{ messageId: string; time: number } | null>(null)
+  
+  const handleMessageTouchStart = useCallback((messageId: string, text: string) => {
+    const now = Date.now()
+    
+    // Check for double-tap (within 300ms on same message)
+    if (lastTapRef.current && 
+        lastTapRef.current.messageId === messageId && 
+        now - lastTapRef.current.time < 300) {
+      // Double-tap detected - copy immediately
+      copyMessage(messageId, text)
+      lastTapRef.current = null
+      return
+    }
+    
+    // Record this tap for potential double-tap
+    lastTapRef.current = { messageId, time: now }
+    
+    // Long press fallback for context menu
     longPressTimerRef.current = setTimeout(() => {
       setContextMenuMessageId(messageId)
       if ('vibrate' in navigator) navigator.vibrate(20)
     }, 500)
-  }, [])
+  }, [copyMessage])
   
   const handleMessageTouchEnd = useCallback(() => {
     if (longPressTimerRef.current) {
@@ -1376,7 +1404,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
                             ? 'bg-green-500 text-white'
                             : 'bg-muted'
                         } ${contextMenuMessageId === msg.id ? 'ring-2 ring-green-400 ring-offset-1' : ''}`}
-                        onTouchStart={() => handleMessageTouchStart(msg.id)}
+                        onTouchStart={() => handleMessageTouchStart(msg.id, msg.text)}
                         onTouchEnd={handleMessageTouchEnd}
                         onTouchCancel={handleMessageTouchEnd}
                       >
