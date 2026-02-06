@@ -182,6 +182,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null) // UX #200: Copy individual message
   const [contextMenuMessageId, setContextMenuMessageId] = useState<string | null>(null) // UX #201: Message context menu
   const [phoneCopied, setPhoneCopied] = useState(false) // Bug fix #271: Phone copy state
+  const [conversationCopied, setConversationCopied] = useState(false) // UX #501: Copy entire conversation
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<Message[]>([]) // Bug fix #14: Track messages for comparison
@@ -670,6 +671,11 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
         }])
         setNewMessage('')
         
+        // Bug fix #500: Reset textarea height after sending
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto'
+        }
+        
         // UX #124: Visual success feedback - scroll to bottom with animation
         setTimeout(() => {
           scrollToBottom(true)
@@ -724,6 +730,26 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
     if ('vibrate' in navigator) navigator.vibrate(10)
     setTimeout(() => setCopiedMessageId(null), 2000)
   }, [])
+  
+  // UX #501: Copy entire conversation with formatting
+  const copyConversation = useCallback(() => {
+    if (messages.length === 0) return
+    
+    const formatted = messages.map(msg => {
+      const time = msg.timestamp 
+        ? new Date(msg.timestamp).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        : ''
+      const sender = msg.fromMe ? 'Eu' : (lead?.name || 'Contato')
+      return `[${time}] ${sender}: ${msg.text}`
+    }).join('\n')
+    
+    const header = `📱 Conversa com ${lead?.name || 'Contato'}\n📞 ${lead?.phone || ''}\n${'─'.repeat(30)}\n\n`
+    
+    navigator.clipboard.writeText(header + formatted)
+    setConversationCopied(true)
+    if ('vibrate' in navigator) navigator.vibrate([10, 30, 10])
+    setTimeout(() => setConversationCopied(false), 2000)
+  }, [messages, lead])
   
   // UX #201: Handle long press for mobile context menu
   // UX #290: Double-tap to copy on mobile (faster than long press)
@@ -1082,6 +1108,45 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
               <span className="text-xs font-medium hidden sm:inline">Analisar</span>
             </Button>
           )}
+          {/* UX #501: More actions dropdown menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-10 w-10 md:h-8 md:w-8 touch-manipulation"
+                title="Mais opções"
+              >
+                <MoreHorizontal className="h-5 w-5 md:h-4 md:w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem 
+                onClick={copyConversation}
+                disabled={messages.length === 0}
+                className="gap-2"
+              >
+                {conversationCopied ? (
+                  <>
+                    <Check className="h-4 w-4 text-green-600" />
+                    <span className="text-green-600">Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4" />
+                    <span>Copiar conversa</span>
+                  </>
+                )}
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={() => fetchMessages(true)}
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span>Atualizar mensagens</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button variant="ghost" size="icon" className="h-8 w-8 hidden md:flex" onClick={onClose}>
             <X className="h-4 w-4" />
           </Button>
