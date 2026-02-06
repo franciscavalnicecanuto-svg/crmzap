@@ -13,7 +13,8 @@ import {
   Check,
   Pencil,
   RotateCcw,
-  AlertTriangle
+  AlertTriangle,
+  CopyPlus
 } from 'lucide-react'
 
 interface Template {
@@ -147,6 +148,24 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
   const handleResetDefaults = () => {
     saveTemplates(DEFAULT_TEMPLATES)
     setDeleteConfirm(null)
+  }
+
+  // UX #180: Duplicate template for quick variations
+  const handleDuplicate = (template: Template) => {
+    const newTemplate: Template = {
+      id: Date.now().toString(),
+      name: `${template.name} (cópia)`,
+      content: template.content
+    }
+    const newTemplates = [...templates, newTemplate]
+    saveTemplates(newTemplates)
+    // Haptic feedback
+    if ('vibrate' in navigator) navigator.vibrate(10)
+    // Start editing the duplicate immediately
+    setEditingTemplate(newTemplate)
+    setNewName(newTemplate.name)
+    setNewContent(newTemplate.content)
+    setIsEditing(true)
   }
 
   const handleAdd = () => {
@@ -290,10 +309,18 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
                     >
                       <Pencil className="w-3.5 h-3.5 text-blue-500" />
                     </button>
+                    {/* UX #180: Duplicate button */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDuplicate(template) }}
+                      className="p-1.5 hover:bg-green-50 rounded"
+                      title="Duplicar"
+                    >
+                      <CopyPlus className="w-3.5 h-3.5 text-green-500" />
+                    </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleCopy(template) }}
                       className="p-1.5 hover:bg-muted rounded"
-                      title="Copiar"
+                      title="Copiar texto"
                     >
                       {copiedId === template.id ? (
                         <Check className="w-3.5 h-3.5 text-green-500" />
