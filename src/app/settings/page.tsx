@@ -556,7 +556,7 @@ export default function SettingsPage() {
             <CardDescription>Gerencie seus dados</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Meta mensal configurável */}
+            {/* Meta mensal configurável - Bug fix #83: Validação de input */}
             <div className="flex items-center justify-between">
               <div>
                 <Label>Meta mensal de vendas</Label>
@@ -567,10 +567,26 @@ export default function SettingsPage() {
                 <Input
                   type="number"
                   className="w-28 h-8"
+                  min="0"
+                  step="100"
                   defaultValue={typeof window !== 'undefined' ? localStorage.getItem('whatszap-monthly-goal') || '10000' : '10000'}
                   onChange={(e) => {
-                    const value = parseInt(e.target.value) || 10000
-                    localStorage.setItem('whatszap-monthly-goal', value.toString())
+                    const value = parseInt(e.target.value)
+                    // Bug fix #83: Não permitir valores negativos ou NaN
+                    if (!isNaN(value) && value >= 0) {
+                      localStorage.setItem('whatszap-monthly-goal', value.toString())
+                    } else if (e.target.value === '' || isNaN(value)) {
+                      // Se campo vazio ou inválido, usar default
+                      localStorage.setItem('whatszap-monthly-goal', '10000')
+                    }
+                  }}
+                  onBlur={(e) => {
+                    // Corrigir valor ao perder foco
+                    const value = parseInt(e.target.value)
+                    if (isNaN(value) || value < 0) {
+                      e.target.value = '10000'
+                      localStorage.setItem('whatszap-monthly-goal', '10000')
+                    }
                   }}
                 />
               </div>

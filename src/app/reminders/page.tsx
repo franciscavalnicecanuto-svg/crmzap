@@ -342,31 +342,56 @@ export default function RemindersPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2">
-                      {/* UX #78: Quick Snooze dropdown for passed reminders */}
+                      {/* UX #78/#82: Quick Snooze buttons for passed reminders with more options */}
                       {status === 'overdue' && (
-                        <div className="flex items-center gap-1">
-                          {[
-                            { label: '1h', ms: 60 * 60 * 1000 },
-                            { label: '3h', ms: 3 * 60 * 60 * 1000 },
-                          ].map((option) => (
-                            <Button
-                              key={option.label}
-                              variant="ghost"
-                              size="sm"
-                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 h-7 text-xs"
-                              onClick={() => {
-                                const newDate = new Date(Date.now() + option.ms).toISOString()
-                                const updated = leads.map(l => 
-                                  l.id === lead.id ? { ...l, reminderDate: newDate } : l
-                                )
-                                setLeads(updated)
-                                localStorage.setItem('whatszap-leads-v3', JSON.stringify(updated))
-                              }}
-                              title={`Adiar ${option.label}`}
-                            >
-                              +{option.label}
-                            </Button>
-                          ))}
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {(() => {
+                            // Helper function to get tomorrow 9am
+                            const getTomorrow9am = () => {
+                              const tomorrow = new Date()
+                              tomorrow.setDate(tomorrow.getDate() + 1)
+                              tomorrow.setHours(9, 0, 0, 0)
+                              return tomorrow.toISOString()
+                            }
+                            // Helper function to get next Monday 9am
+                            const getNextMonday9am = () => {
+                              const today = new Date()
+                              const daysUntilMonday = (8 - today.getDay()) % 7 || 7
+                              const monday = new Date(today)
+                              monday.setDate(today.getDate() + daysUntilMonday)
+                              monday.setHours(9, 0, 0, 0)
+                              return monday.toISOString()
+                            }
+                            
+                            const snoozeOptions = [
+                              { label: '1h', getDate: () => new Date(Date.now() + 60 * 60 * 1000).toISOString(), title: 'Adiar 1 hora' },
+                              { label: '3h', getDate: () => new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(), title: 'Adiar 3 horas' },
+                              { label: 'Amanhã', getDate: getTomorrow9am, title: 'Amanhã às 9h' },
+                              { label: 'Seg', getDate: getNextMonday9am, title: 'Segunda às 9h' },
+                            ]
+                            
+                            return snoozeOptions.map((option) => (
+                              <Button
+                                key={option.label}
+                                variant="ghost"
+                                size="sm"
+                                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 h-7 text-xs"
+                                onClick={() => {
+                                  const newDate = option.getDate()
+                                  const updated = leads.map(l => 
+                                    l.id === lead.id ? { ...l, reminderDate: newDate } : l
+                                  )
+                                  setLeads(updated)
+                                  localStorage.setItem('whatszap-leads-v3', JSON.stringify(updated))
+                                  // Haptic feedback
+                                  if ('vibrate' in navigator) navigator.vibrate(10)
+                                }}
+                                title={option.title}
+                              >
+                                +{option.label}
+                              </Button>
+                            ))
+                          })()}
                         </div>
                       )}
                       <Button 

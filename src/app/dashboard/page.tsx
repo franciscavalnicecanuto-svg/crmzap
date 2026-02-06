@@ -1661,30 +1661,72 @@ function DashboardContent() {
                                         {lead.unreadCount! > 9 ? '9+' : lead.unreadCount}
                                       </span>
                                     )}
-                                    {lead.reminderDate && (
-                                      <div className="relative group/reminder">
-                                        <Bell className={`${settings.compactView ? 'w-2.5 h-2.5' : 'w-3 h-3'} text-amber-500 cursor-help`} />
-                                        <div className="absolute bottom-full left-0 mb-1 hidden group-hover/reminder:block z-50">
-                                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-2 shadow-lg min-w-[160px] text-[10px]">
-                                            <div className="font-semibold text-amber-700 mb-1">🔔 Lembrete</div>
-                                            <div className="text-amber-600">
-                                              {new Date(lead.reminderDate).toLocaleString('pt-BR', { 
-                                                day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
-                                              })}
+                                    {/* UX #85: Enhanced reminder indicator with urgency levels */}
+                                    {lead.reminderDate && (() => {
+                                      const reminderTime = new Date(lead.reminderDate).getTime()
+                                      const now = Date.now()
+                                      const timeDiff = reminderTime - now
+                                      const isOverdue = timeDiff < 0
+                                      const isUrgent = !isOverdue && timeDiff < 2 * 60 * 60 * 1000 // menos de 2h
+                                      const isSoon = !isOverdue && !isUrgent && timeDiff < 24 * 60 * 60 * 1000 // menos de 24h
+                                      
+                                      // Helper para mostrar tempo restante
+                                      const getTimeLeft = () => {
+                                        if (isOverdue) {
+                                          const mins = Math.abs(Math.floor(timeDiff / 60000))
+                                          if (mins < 60) return `${mins}min atrás`
+                                          const hours = Math.floor(mins / 60)
+                                          if (hours < 24) return `${hours}h atrás`
+                                          return `${Math.floor(hours / 24)}d atrás`
+                                        }
+                                        const mins = Math.floor(timeDiff / 60000)
+                                        if (mins < 60) return `em ${mins}min`
+                                        const hours = Math.floor(mins / 60)
+                                        if (hours < 24) return `em ${hours}h`
+                                        return `em ${Math.floor(hours / 24)}d`
+                                      }
+                                      
+                                      return (
+                                        <div className="relative group/reminder">
+                                          <Bell className={`${settings.compactView ? 'w-2.5 h-2.5' : 'w-3 h-3'} cursor-help transition-all ${
+                                            isOverdue ? 'text-red-500 animate-pulse' :
+                                            isUrgent ? 'text-orange-500 animate-bounce' :
+                                            isSoon ? 'text-amber-500' :
+                                            'text-amber-400'
+                                          }`} />
+                                          <div className="absolute bottom-full left-0 mb-1 hidden group-hover/reminder:block z-50">
+                                            <div className={`rounded-lg p-2 shadow-lg min-w-[160px] text-[10px] border ${
+                                              isOverdue ? 'bg-red-50 border-red-200' :
+                                              isUrgent ? 'bg-orange-50 border-orange-200' :
+                                              'bg-amber-50 border-amber-200'
+                                            }`}>
+                                              <div className={`font-semibold mb-1 ${
+                                                isOverdue ? 'text-red-700' : isUrgent ? 'text-orange-700' : 'text-amber-700'
+                                              }`}>
+                                                {isOverdue ? '⚠️ Lembrete atrasado!' : isUrgent ? '🔔 Lembrete em breve!' : '🔔 Lembrete'}
+                                              </div>
+                                              <div className={isOverdue ? 'text-red-600' : isUrgent ? 'text-orange-600' : 'text-amber-600'}>
+                                                {new Date(lead.reminderDate).toLocaleString('pt-BR', { 
+                                                  day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' 
+                                                })}
+                                                <span className="ml-1 font-medium">({getTimeLeft()})</span>
+                                              </div>
+                                              {lead.reminderNote && (
+                                                <div className={`mt-1 italic ${isOverdue ? 'text-red-800' : 'text-amber-800'}`}>
+                                                  "{lead.reminderNote}"
+                                                </div>
+                                              )}
+                                              <button 
+                                                onClick={(e) => { e.stopPropagation(); clearReminder(lead.id) }}
+                                                className="mt-1.5 text-red-500 hover:text-red-700 text-[9px]"
+                                              >
+                                                ✕ Remover
+                                              </button>
                                             </div>
-                                            {lead.reminderNote && (
-                                              <div className="text-amber-800 mt-1 italic">"{lead.reminderNote}"</div>
-                                            )}
-                                            <button 
-                                              onClick={(e) => { e.stopPropagation(); clearReminder(lead.id) }}
-                                              className="mt-1.5 text-red-500 hover:text-red-700 text-[9px]"
-                                            >
-                                              ✕ Remover
-                                            </button>
                                           </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      )
+                                    })()}
                                   </div>
                                   {!settings.compactView && (
                                     <div className="flex items-center gap-1">

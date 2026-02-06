@@ -959,6 +959,13 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
             {sendError}
           </div>
         )}
+        {/* UX #84: Sending indicator above input */}
+        {isSending && (
+          <div className="mb-2 flex items-center gap-2 text-xs text-green-600 animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            <span>Enviando mensagem...</span>
+          </div>
+        )}
         <div className="flex gap-2 items-end">
           <TemplateButton onSelect={(content) => setNewMessage(content)} />
           <div className="flex-1 relative">
@@ -967,13 +974,15 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="w-full min-h-[36px] max-h-32 px-3 py-2 text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              className={`w-full min-h-[36px] max-h-32 px-3 py-2 text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all ${
+                isSending ? 'bg-green-50/50 border-green-300' : ''
+              }`}
               style={{ height: Math.min(Math.max(36, newMessage.split('\n').length * 20 + 16), 128) }}
               disabled={isSending}
               rows={1}
             />
             {/* UX #68: Character counter when message is getting long */}
-            {newMessage.length > 100 && (
+            {newMessage.length > 100 && !isSending && (
               <span className={`absolute bottom-1 right-2 text-[10px] ${
                 newMessage.length > 1000 ? 'text-amber-500' : 'text-muted-foreground'
               }`}>
@@ -983,7 +992,11 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
           </div>
           <Button 
             size="sm" 
-            className="h-9 bg-green-500 hover:bg-green-600 shrink-0"
+            className={`h-9 shrink-0 transition-all ${
+              isSending 
+                ? 'bg-green-400 cursor-not-allowed' 
+                : 'bg-green-500 hover:bg-green-600'
+            }`}
             onClick={sendMessage}
             disabled={isSending || !newMessage.trim()}
             title="Enviar mensagem (Enter)"

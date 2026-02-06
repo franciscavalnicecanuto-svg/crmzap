@@ -485,16 +485,24 @@ export default function ReportsPage() {
     const currentMonth = now.getMonth()
     const currentYear = now.getFullYear()
     
-    // Filter leads by month
-    const isThisMonth = (dateStr?: string) => {
-      if (!dateStr) return false
+    // Bug fix #81: Safe date parsing with validation
+    const parseSafeDate = (dateStr?: string): Date | null => {
+      if (!dateStr) return null
       const d = new Date(dateStr)
+      // Check if date is valid (not NaN)
+      return isNaN(d.getTime()) ? null : d
+    }
+    
+    // Filter leads by month with safe date handling
+    const isThisMonth = (dateStr?: string) => {
+      const d = parseSafeDate(dateStr)
+      if (!d) return false
       return d.getMonth() === currentMonth && d.getFullYear() === currentYear
     }
     
     const isLastMonth = (dateStr?: string) => {
-      if (!dateStr) return false
-      const d = new Date(dateStr)
+      const d = parseSafeDate(dateStr)
+      if (!d) return false
       const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1
       const lastYear = currentMonth === 0 ? currentYear - 1 : currentYear
       return d.getMonth() === lastMonth && d.getFullYear() === lastYear

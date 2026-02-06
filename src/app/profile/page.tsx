@@ -28,6 +28,8 @@ export default function ProfilePage() {
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false) // Bug fix #79: Custom modal
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     async function loadUser() {
@@ -191,18 +193,75 @@ export default function ProfilePage() {
             <CardDescription>Ações irreversíveis</CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="destructive" onClick={() => {
-              if (confirm('Tem certeza que deseja excluir sua conta? Esta ação não pode ser desfeita.')) {
-                // Would delete account in production
-                signOut()
-                router.push('/')
-              }
-            }}>
+            <Button variant="destructive" onClick={() => setShowDeleteConfirm(true)}>
               Excluir minha conta
             </Button>
           </CardContent>
         </Card>
       </main>
+
+      {/* Bug fix #79: Modal de confirmação customizado (substituir confirm() nativo) */}
+      {showDeleteConfirm && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in-0 duration-200"
+          onClick={() => setShowDeleteConfirm(false)}
+        >
+          <div 
+            className="bg-background rounded-lg p-6 w-full max-w-sm shadow-xl animate-in zoom-in-95 duration-200"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                <User className="w-6 h-6 text-red-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold">Excluir Conta</h3>
+                <p className="text-sm text-muted-foreground">Esta ação é irreversível</p>
+              </div>
+            </div>
+            <p className="text-sm mb-4 text-muted-foreground">
+              Tem certeza que deseja excluir sua conta? Todos os seus dados serão permanentemente removidos e você será desconectado.
+            </p>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                className="flex-1"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                Cancelar
+              </Button>
+              <Button 
+                className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                onClick={async () => {
+                  setIsDeleting(true)
+                  try {
+                    // Would delete account data from Supabase in production
+                    localStorage.removeItem('whatszap-leads-v3')
+                    localStorage.removeItem('whatszap-profile')
+                    localStorage.removeItem('whatszap-settings')
+                    await signOut()
+                    router.push('/')
+                  } catch (e) {
+                    console.error('Failed to delete account:', e)
+                    setIsDeleting(false)
+                    setShowDeleteConfirm(false)
+                  }
+                }}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Excluindo...
+                  </>
+                ) : (
+                  'Excluir Conta'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
