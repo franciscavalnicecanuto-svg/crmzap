@@ -33,8 +33,48 @@
 - **URL**: https://whatszap-zeta.vercel.app
 - **Status**: ✅ Produção
 
+---
+
+## Session Update: 05:45 AM
+
+### Melhoria Adicional Implementada
+
+#### 4. ✅ UX - Badge "NOVO" para Leads Recentes
+- Leads criados nas últimas 24 horas mostram badge "NOVO" em azul
+- Tooltip mostra tempo exato desde a criação
+- Apenas visível quando não está em modo compacto
+
+### Arquivos Modificados (atualização)
+1. `src/app/dashboard/page.tsx` (+12 linhas - badge NOVO)
+
+### Deploy Adicional
+- **Commit**: `6fa1942` - "feat(ux): add 'NOVO' badge for recently created leads"
+- **URL**: https://whatszap-zeta.vercel.app
+- **Status**: ✅ Produção
+
+---
+
+## Resumo Total da Sessão
+
+### Melhorias Implementadas: 4
+1. ✅ Histórico de lembretes completados
+2. ✅ Barra de progresso visual do sync
+3. ✅ Busca de telefone melhorada
+4. ✅ Badge "NOVO" para leads recentes
+
+### Arquivos Modificados: 4
+- `src/app/reminders/page.tsx`
+- `src/app/dashboard/page.tsx`
+- `src/app/globals.css`
+- `memory/crmzap-intensive-log.md`
+
+### Commits: 2
+1. `1beb45d` - feat(ux): intensive improvements batch
+2. `6fa1942` - feat(ux): add 'NOVO' badge for recently created leads
+
 ### Próximas Melhorias Sugeridas
 - [ ] Adicionar swipe para mudar status de lead no mobile
 - [ ] Melhorar indicador de typing no chat
 - [ ] Adicionar atalhos de teclado para navegação entre colunas
 - [ ] Implementar modo offline com queue de mensagens
+- [ ] Adicionar filtro por leads "quentes" (atividade nas últimas 24h)
