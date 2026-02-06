@@ -863,17 +863,19 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-1">
+        {/* Bug fix #184: Enhanced touch targets for mobile (44px recommended) */}
+        <div className="flex items-center gap-1 md:gap-1">
           {/* Tags button */}
           {onOpenTags && (
             <Button 
               variant="outline"
               size="icon" 
-              className="h-8 w-8"
+              className="h-10 w-10 md:h-8 md:w-8 touch-manipulation"
               onClick={onOpenTags}
-              title="Gerenciar tags"
+              title="Gerenciar tags (T)"
+              aria-label="Gerenciar tags do lead"
             >
-              <Tag className="h-4 w-4" />
+              <Tag className="h-5 w-5 md:h-4 md:w-4" />
             </Button>
           )}
           {/* Reminder button */}
@@ -881,32 +883,35 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
             <Button 
               variant="outline"
               size="icon" 
-              className="h-8 w-8"
+              className="h-10 w-10 md:h-8 md:w-8 touch-manipulation"
               onClick={onOpenReminder}
-              title="Criar lembrete"
+              title="Criar lembrete (R)"
+              aria-label="Criar lembrete para este lead"
             >
-              <Bell className="h-4 w-4" />
+              <Bell className="h-5 w-5 md:h-4 md:w-4" />
             </Button>
           )}
           {lead.reminderDate && (
             <Button 
               variant="outline"
               size="icon" 
-              className="h-8 w-8 border-amber-500 text-amber-600"
+              className="h-10 w-10 md:h-8 md:w-8 border-amber-500 text-amber-600 touch-manipulation"
               onClick={onOpenReminder}
-              title="Lembrete agendado"
+              title="Editar lembrete agendado"
+              aria-label="Editar lembrete existente"
             >
-              <Bell className="h-4 w-4" />
+              <Bell className="h-5 w-5 md:h-4 md:w-4" />
             </Button>
           )}
           {canAnalyze && (
             <Button 
               variant="default"
               size="sm" 
-              className="h-8 px-3 bg-purple-600 hover:bg-purple-700 text-white gap-1.5"
+              className="h-10 px-4 md:h-8 md:px-3 bg-purple-600 hover:bg-purple-700 text-white gap-1.5 touch-manipulation"
               onClick={handleAnalyze}
               disabled={isAnalyzing}
-              title="Analisar conversa com IA"
+              title="Analisar conversa com IA (Ctrl+Shift+A)"
+              aria-label={isAnalyzing ? 'Analisando conversa...' : 'Analisar conversa com inteligência artificial'}
             >
               {isAnalyzing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -1086,6 +1091,10 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
         className="flex-1 overflow-y-auto p-3 relative" 
         ref={containerRef}
         onScroll={handleScroll}
+        role="log"
+        aria-label={`Conversa com ${lead?.name || 'contato'}. ${messages.length} mensagens.`}
+        aria-live="polite"
+        aria-atomic="false"
       >
         {isLoading && isFirstLoad ? (
           // Skeleton loading - looks like real messages
@@ -1114,7 +1123,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
             </Button>
           </div>
         ) : messages.length === 0 ? (
-          // UX #69 + UX #135: Improved empty state with conversation starters and contextual tips
+          // UX #69 + UX #135 + UX #185: Improved empty state with contextual conversation starters
           <div className="flex flex-col items-center justify-center h-full text-center p-6">
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center mb-4 shadow-sm">
               <Send className="w-7 h-7 text-green-500" />
@@ -1124,23 +1133,49 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
               Seja o primeiro a enviar uma mensagem para {lead?.name?.split(' ')[0] || 'este contato'}
             </p>
             <div className="flex flex-wrap gap-2 justify-center max-w-[280px] mb-4">
-              {[
-                '👋 Olá! Tudo bem?',
-                '📞 Posso te ligar?',
-                '❓ Posso ajudar?'
-              ].map((starter, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => {
-                    setNewMessage(starter)
-                    // Haptic feedback
-                    if ('vibrate' in navigator) navigator.vibrate(10)
-                  }}
-                  className="px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-full text-xs transition-all border border-green-200 hover:shadow-sm active:scale-95"
-                >
-                  {starter}
-                </button>
-              ))}
+              {/* UX #185: Contextual starters based on lead status */}
+              {(() => {
+                const status = lead?.status || 'novo'
+                const startersByStatus: Record<string, string[]> = {
+                  novo: [
+                    '👋 Olá! Tudo bem?',
+                    '❓ Como posso ajudar?',
+                    '📞 Posso te ligar?'
+                  ],
+                  em_contato: [
+                    '👋 Olá! Tudo bem?',
+                    '📅 Podemos agendar?',
+                    '💬 Ficou alguma dúvida?'
+                  ],
+                  negociando: [
+                    '💰 Vou verificar os valores',
+                    '🤝 Vamos fechar negócio?',
+                    '📊 Preparei uma proposta'
+                  ],
+                  fechado: [
+                    '🎉 Parabéns pela compra!',
+                    '📦 Vou enviar os dados',
+                    '⭐ Pode avaliar?'
+                  ],
+                  perdido: [
+                    '👋 Olá, tudo bem?',
+                    '💡 Temos novidades!',
+                    '🎁 Oferta especial'
+                  ]
+                }
+                return (startersByStatus[status] || startersByStatus.novo).map((starter, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => {
+                      setNewMessage(starter)
+                      if ('vibrate' in navigator) navigator.vibrate(10)
+                    }}
+                    className="px-3 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-full text-xs transition-all border border-green-200 hover:shadow-sm active:scale-95 touch-manipulation min-h-[36px]"
+                  >
+                    {starter}
+                  </button>
+                ))
+              })()}
             </div>
             {/* UX #135: Contextual tips */}
             <div className="text-[10px] text-muted-foreground/70 space-y-1 max-w-[220px]">
@@ -1237,38 +1272,76 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
       </div>
 
       {/* Quick Replies - Bug fix #23: Only show when connected */}
-      {/* UX #70/#102: Improved quick replies with better mobile scrolling and compact mode */}
+      {/* UX #70/#102/#183: Smart contextual quick replies based on lead status */}
       {lead && messages.length > 0 && isConnected && (
         <div className="px-2 pt-2 border-t bg-gradient-to-r from-gray-50/80 to-green-50/30">
           <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory -mx-2 px-2">
-            {[
-              { emoji: '👋', text: 'Olá! Tudo bem?', short: 'Olá!', shortcut: '1' },
-              { emoji: '⏰', text: 'Um momento, por favor', short: 'Um momento', shortcut: '2' },
-              { emoji: '✅', text: 'Perfeito!', short: 'Perfeito!', shortcut: '3' },
-              { emoji: '📞', text: 'Posso te ligar?', short: 'Ligar?', shortcut: '4' },
-              { emoji: '📅', text: 'Podemos agendar?', short: 'Agendar?', shortcut: '5' },
-              { emoji: '💰', text: 'Vou verificar os valores', short: 'Ver valores', shortcut: '6' },
-              { emoji: '🙏', text: 'Obrigado pelo contato!', short: 'Obrigado!', shortcut: '7' },
-            ].map((reply, idx) => (
-              <Button
-                key={idx}
-                variant="outline"
-                size="sm"
-                className="h-8 px-2 text-xs whitespace-nowrap shrink-0 hover:bg-green-100 hover:border-green-400 hover:text-green-800 hover:shadow-sm active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:ring-offset-1 snap-start touch-manipulation min-w-[60px]"
-                onClick={() => {
-                  setNewMessage(reply.text)
-                  // UX: Haptic feedback
-                  if ('vibrate' in navigator) navigator.vibrate(10)
-                }}
-                disabled={isSending}
-                title={`${reply.text} (Alt+${reply.shortcut})`}
-                aria-label={`Resposta rápida: ${reply.text}`}
-              >
-                <span className="mr-0.5">{reply.emoji}</span>
-                <span className="hidden sm:inline">{reply.text}</span>
-                <span className="sm:hidden">{reply.short}</span>
-              </Button>
-            ))}
+            {(() => {
+              // UX #183: Contextual quick replies based on lead status
+              const status = lead.status || 'novo'
+              const baseReplies = [
+                { emoji: '👋', text: 'Olá! Tudo bem?', short: 'Olá!', shortcut: '1' },
+                { emoji: '⏰', text: 'Um momento, por favor', short: 'Um momento', shortcut: '2' },
+                { emoji: '✅', text: 'Perfeito!', short: 'Perfeito!', shortcut: '3' },
+              ]
+              
+              const statusReplies: Record<string, typeof baseReplies> = {
+                novo: [
+                  ...baseReplies,
+                  { emoji: '❓', text: 'Como posso te ajudar?', short: 'Ajudar?', shortcut: '4' },
+                  { emoji: '📞', text: 'Posso te ligar para explicar melhor?', short: 'Ligar?', shortcut: '5' },
+                  { emoji: '📋', text: 'Quer que eu te envie mais informações?', short: 'Info?', shortcut: '6' },
+                  { emoji: '🙏', text: 'Obrigado pelo contato!', short: 'Obrigado!', shortcut: '7' },
+                ],
+                em_contato: [
+                  ...baseReplies,
+                  { emoji: '📅', text: 'Podemos agendar uma conversa?', short: 'Agendar?', shortcut: '4' },
+                  { emoji: '💬', text: 'Ficou alguma dúvida?', short: 'Dúvidas?', shortcut: '5' },
+                  { emoji: '📋', text: 'Vou te enviar uma proposta', short: 'Proposta', shortcut: '6' },
+                  { emoji: '⏳', text: 'Estou aguardando seu retorno', short: 'Aguardando', shortcut: '7' },
+                ],
+                negociando: [
+                  ...baseReplies,
+                  { emoji: '💰', text: 'Vou verificar os valores pra você', short: 'Valores', shortcut: '4' },
+                  { emoji: '🤝', text: 'Podemos fechar negócio?', short: 'Fechar?', shortcut: '5' },
+                  { emoji: '📊', text: 'Preparei condições especiais', short: 'Especial', shortcut: '6' },
+                  { emoji: '⏰', text: 'Essa condição é válida até amanhã', short: 'Urgente', shortcut: '7' },
+                ],
+                fechado: [
+                  { emoji: '🎉', text: 'Parabéns pela sua compra!', short: 'Parabéns!', shortcut: '1' },
+                  { emoji: '📦', text: 'Vou enviar os dados de acesso', short: 'Acesso', shortcut: '2' },
+                  { emoji: '❓', text: 'Precisa de ajuda com algo?', short: 'Ajuda?', shortcut: '3' },
+                  { emoji: '⭐', text: 'Que tal deixar uma avaliação?', short: 'Avaliação', shortcut: '4' },
+                  { emoji: '🙏', text: 'Obrigado pela preferência!', short: 'Obrigado!', shortcut: '5' },
+                ],
+                perdido: [
+                  { emoji: '👋', text: 'Olá! Tudo bem com você?', short: 'Olá!', shortcut: '1' },
+                  { emoji: '💡', text: 'Temos novidades que podem te interessar', short: 'Novidades', shortcut: '2' },
+                  { emoji: '🎁', text: 'Preparei uma condição especial', short: 'Especial', shortcut: '3' },
+                  { emoji: '❓', text: 'Posso te ajudar com algo?', short: 'Ajudar?', shortcut: '4' },
+                ],
+              }
+              
+              return (statusReplies[status] || statusReplies.novo).map((reply, idx) => (
+                <Button
+                  key={idx}
+                  variant="outline"
+                  size="sm"
+                  className="h-8 px-2 text-xs whitespace-nowrap shrink-0 hover:bg-green-100 hover:border-green-400 hover:text-green-800 hover:shadow-sm active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:ring-offset-1 snap-start touch-manipulation min-w-[60px]"
+                  onClick={() => {
+                    setNewMessage(reply.text)
+                    if ('vibrate' in navigator) navigator.vibrate(10)
+                  }}
+                  disabled={isSending}
+                  title={`${reply.text} (Alt+${reply.shortcut})`}
+                  aria-label={`Resposta rápida: ${reply.text}`}
+                >
+                  <span className="mr-0.5">{reply.emoji}</span>
+                  <span className="hidden sm:inline">{reply.text}</span>
+                  <span className="sm:hidden">{reply.short}</span>
+                </Button>
+              ))
+            })()}
           </div>
         </div>
       )}

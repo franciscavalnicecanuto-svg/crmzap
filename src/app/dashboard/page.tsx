@@ -2459,41 +2459,77 @@ function DashboardContent() {
               </button>
             </div>
             
-            {/* UX #75: Quick Snooze Buttons */}
+            {/* UX #75 + UX #182: Enhanced Quick Snooze Buttons with smart suggestions */}
             <div className="mb-3">
               <label className="text-xs text-muted-foreground mb-1.5 block">⚡ Atalhos rápidos</label>
-              <div className="flex gap-1.5">
+              <div className="grid grid-cols-4 gap-1.5 mb-2">
                 {[
-                  { label: '15min', ms: 15 * 60 * 1000 },
-                  { label: '1h', ms: 60 * 60 * 1000 },
-                  { label: '3h', ms: 3 * 60 * 60 * 1000 },
-                  { label: 'Amanhã 9h', ms: 'tomorrow' as const },
-                ].map((option) => (
-                  <button
-                    key={option.label}
-                    onClick={() => {
-                      let targetDate: Date
-                      if (option.ms === 'tomorrow') {
-                        targetDate = new Date()
-                        targetDate.setDate(targetDate.getDate() + 1)
-                        targetDate.setHours(9, 0, 0, 0)
-                      } else {
-                        targetDate = new Date(Date.now() + option.ms)
-                      }
-                      const year = targetDate.getFullYear()
-                      const month = String(targetDate.getMonth() + 1).padStart(2, '0')
-                      const day = String(targetDate.getDate()).padStart(2, '0')
-                      const hours = String(targetDate.getHours()).padStart(2, '0')
-                      const minutes = String(targetDate.getMinutes()).padStart(2, '0')
-                      setReminderDate(`${year}-${month}-${day}T${hours}:${minutes}`)
-                      // Haptic feedback
-                      if ('vibrate' in navigator) navigator.vibrate(10)
-                    }}
-                    className="flex-1 px-2 py-1.5 text-xs rounded border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-300 transition-all active:scale-95"
-                  >
-                    {option.label}
-                  </button>
-                ))}
+                  { label: '30min', ms: 30 * 60 * 1000, icon: '⏰' },
+                  { label: '1h', ms: 60 * 60 * 1000, icon: '🕐' },
+                  { label: '3h', ms: 3 * 60 * 60 * 1000, icon: '🕒' },
+                  { label: 'Amanhã 9h', ms: 'tomorrow' as const, icon: '☀️' },
+                ].map((option) => {
+                  // Check if this option is currently selected
+                  const getTargetDate = () => {
+                    if (option.ms === 'tomorrow') {
+                      const d = new Date()
+                      d.setDate(d.getDate() + 1)
+                      d.setHours(9, 0, 0, 0)
+                      return d
+                    }
+                    return new Date(Date.now() + option.ms)
+                  }
+                  const targetDate = getTargetDate()
+                  const formatted = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}T${String(targetDate.getHours()).padStart(2, '0')}:${String(targetDate.getMinutes()).padStart(2, '0')}`
+                  const isSelected = reminderDate === formatted
+                  
+                  return (
+                    <button
+                      key={option.label}
+                      onClick={() => {
+                        setReminderDate(formatted)
+                        if ('vibrate' in navigator) navigator.vibrate(10)
+                      }}
+                      className={`px-2 py-2 text-xs rounded border transition-all active:scale-95 flex flex-col items-center gap-0.5 ${
+                        isSelected 
+                          ? 'border-amber-500 bg-amber-100 text-amber-800 ring-2 ring-amber-300 font-medium' 
+                          : 'border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 hover:border-amber-300'
+                      }`}
+                    >
+                      <span className="text-sm">{option.icon}</span>
+                      <span>{option.label}</span>
+                    </button>
+                  )
+                })}
+              </div>
+              {/* UX #182: Segunda linha com opções de dia específico */}
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { label: 'Seg 9h', getDate: () => { const d = new Date(); const daysUntil = (8 - d.getDay()) % 7 || 7; d.setDate(d.getDate() + daysUntil); d.setHours(9, 0, 0, 0); return d } },
+                  { label: 'Sex 14h', getDate: () => { const d = new Date(); const daysUntil = (12 - d.getDay()) % 7 || 7; d.setDate(d.getDate() + daysUntil); d.setHours(14, 0, 0, 0); return d } },
+                  { label: 'Próx semana', getDate: () => { const d = new Date(); d.setDate(d.getDate() + 7); d.setHours(9, 0, 0, 0); return d } },
+                ].map((option) => {
+                  const targetDate = option.getDate()
+                  const formatted = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}T${String(targetDate.getHours()).padStart(2, '0')}:${String(targetDate.getMinutes()).padStart(2, '0')}`
+                  const isSelected = reminderDate === formatted
+                  
+                  return (
+                    <button
+                      key={option.label}
+                      onClick={() => {
+                        setReminderDate(formatted)
+                        if ('vibrate' in navigator) navigator.vibrate(10)
+                      }}
+                      className={`px-2 py-1.5 text-[10px] rounded border transition-all active:scale-95 ${
+                        isSelected 
+                          ? 'border-blue-500 bg-blue-100 text-blue-800 ring-1 ring-blue-300 font-medium' 
+                          : 'border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 hover:border-blue-300'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
             
