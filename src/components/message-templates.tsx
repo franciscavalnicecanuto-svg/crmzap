@@ -66,6 +66,8 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null) // Bug fix #56: Confirm before delete
   const [previewTemplate, setPreviewTemplate] = useState<Template | null>(null) // UX #504: Preview before send
+  const [showDiscardWarning, setShowDiscardWarning] = useState(false) // Bug fix #650: Warn before discarding edits
+  const [templateUsage, setTemplateUsage] = useState<Record<string, number>>({}) // UX #654: Track template usage
   const searchInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -82,18 +84,35 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
       setTemplates(DEFAULT_TEMPLATES)
       localStorage.setItem('crmzap-message-templates', JSON.stringify(DEFAULT_TEMPLATES))
     }
+    // UX #654: Load template usage stats
+    const savedUsage = localStorage.getItem('crmzap-template-usage')
+    if (savedUsage) {
+      try {
+        setTemplateUsage(JSON.parse(savedUsage))
+      } catch {
+        setTemplateUsage({})
+      }
+    }
     // UX: Focus search on open
     setTimeout(() => searchInputRef.current?.focus(), 100)
   }, [])
+
+  // Bug fix #650: Track unsaved changes
+  const hasUnsavedChanges = isEditing && (newName.trim() !== '' || newContent.trim() !== '')
 
   // UX #58: Close on ESC
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (previewTemplate) {
+        if (showDiscardWarning) {
+          setShowDiscardWarning(false)
+        } else if (previewTemplate) {
           setPreviewTemplate(null)
         } else if (deleteConfirm) {
           setDeleteConfirm(null)
+        } else if (hasUnsavedChanges) {
+          // Bug fix #650: Show warning before discarding
+          setShowDiscardWarning(true)
         } else if (isEditing || editingTemplate) {
           setIsEditing(false)
           setEditingTemplate(null)
@@ -120,8 +139,22 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
   }
 
   const handleSelect = (template: Template) => {
+    // UX #654: Track template usage
+    const newUsage = { ...templateUsage, [template.id]: (templateUsage[template.id] || 0) + 1 }
+    setTemplateUsage(newUsage)
+    localStorage.setItem('crmzap-template-usage', JSON.stringify(newUsage))
+    
     onSelect(template.content)
     onClose()
+  }
+  
+  // Bug fix #650: Safe close that checks for unsaved changes
+  const handleSafeClose = () => {
+    if (hasUnsavedChanges) {
+      setShowDiscardWarning(true)
+    } else {
+      onClose()
+    }
   }
 
   const handleCopy = (template: Template) => {
@@ -219,13 +252,16 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
     setEditingTemplate(null)
   }
 
-  const filteredTemplates = templates.filter(t => 
-    t.name.toLowerCase().includes(search.toLowerCase()) ||
-    t.content.toLowerCase().includes(search.toLowerCase())
-  )
+  // UX #654: Sort templates by usage (most used first), then filter by search
+  const filteredTemplates = templates
+    .filter(t => 
+      t.name.toLowerCase().includes(search.toLowerCase()) ||
+      t.content.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => (templateUsage[b.id] || 0) - (templateUsage[a.id] || 0))
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in-0 duration-150" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in-0 duration-150" onClick={handleSafeClose}>
       <div 
         className="bg-background rounded-xl w-full max-w-md max-h-[80vh] overflow-hidden shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-200"
         onClick={e => e.stopPropagation()}
@@ -250,11 +286,51 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
             >
               <RotateCcw className="w-4 h-4" />
             </button>
-            <button onClick={onClose} className="p-1.5 hover:bg-muted rounded-lg">
+            <button onClick={handleSafeClose} className="p-1.5 hover:bg-muted rounded-lg">
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
+
+        {/* Bug fix #650: Discard warning modal */}
+        {showDiscardWarning && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/30 rounded-xl animate-in fade-in-0 duration-150">
+            <div className="bg-background rounded-lg p-4 shadow-xl m-4 max-w-[280px] animate-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-2 text-amber-600 mb-2">
+                <AlertTriangle className="w-5 h-5" />
+                <span className="font-medium">Descartar alterações?</span>
+              </div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Você tem alterações não salvas. Deseja descartar?
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setShowDiscardWarning(false)}
+                >
+                  Continuar editando
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowDiscardWarning(false)
+                    setIsEditing(false)
+                    setEditingTemplate(null)
+                    setNewName('')
+                    setNewContent('')
+                    onClose()
+                  }}
+                >
+                  Descartar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Search */}
         <div className="p-3 border-b">
@@ -361,7 +437,15 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
               ) : (
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium text-sm">{template.name}</div>
+                    <div className="font-medium text-sm flex items-center gap-1.5">
+                      {template.name}
+                      {/* UX #654: Show usage count for frequently used templates */}
+                      {templateUsage[template.id] > 0 && (
+                        <span className="text-[9px] px-1.5 py-0.5 bg-green-100 text-green-700 rounded-full font-normal">
+                          {templateUsage[template.id]}x
+                        </span>
+                      )}
+                    </div>
                     <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">
                       {template.content}
                     </p>
@@ -410,6 +494,13 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
           {filteredTemplates.length === 0 && (
             <div className="text-center py-8 text-muted-foreground text-sm">
               {search ? 'Nenhum template encontrado' : 'Nenhum template criado'}
+            </div>
+          )}
+          
+          {/* UX #651: Hint about double-click */}
+          {filteredTemplates.length > 0 && !previewTemplate && (
+            <div className="text-center text-[10px] text-muted-foreground/70 py-2 border-t mt-1">
+              💡 Clique para preview • Duplo clique para usar direto
             </div>
           )}
         </div>
