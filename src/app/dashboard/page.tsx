@@ -1558,19 +1558,25 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* UX: Sync Progress Bar */}
+        {/* UX #189: Enhanced Sync Progress Bar with shimmer */}
         {isSyncing && (
-          <div className="bg-green-50 border-b border-green-200 px-3 py-2 animate-in slide-in-from-top-1 duration-200">
+          <div className="bg-green-50 border-b border-green-200 px-3 py-2 animate-in slide-in-from-top-1 duration-200 sync-shimmer">
             <div className="flex items-center gap-2 text-xs text-green-700 mb-1">
               <Loader2 className="w-3 h-3 animate-spin" />
-              <span>Sincronizando mensagens...</span>
-              <span className="ml-auto font-medium">{Math.round(syncProgress)}%</span>
+              <span className="font-medium">
+                {syncProgress < 30 ? 'Conectando...' : 
+                 syncProgress < 70 ? 'Sincronizando mensagens...' :
+                 syncProgress < 95 ? 'Quase lá...' : 'Finalizando!'}
+              </span>
+              <span className="ml-auto font-bold count-animated">{Math.round(syncProgress)}%</span>
             </div>
-            <div className="w-full h-1.5 bg-green-200 rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-green-200/60 rounded-full overflow-hidden backdrop-blur-sm">
               <div 
-                className="h-full bg-green-500 rounded-full transition-all duration-300 ease-out"
+                className="h-full bg-gradient-to-r from-green-500 via-green-400 to-green-500 rounded-full transition-all duration-300 ease-out relative"
                 style={{ width: `${syncProgress}%` }}
-              />
+              >
+                <div className="absolute inset-0 bg-white/20 animate-pulse" />
+              </div>
             </div>
           </div>
         )}
@@ -1772,6 +1778,28 @@ function DashboardContent() {
                   })}
                 </DropdownMenuContent>
               </DropdownMenu>
+              
+              {/* UX #209: Last sync indicator */}
+              {lastSyncTime && !isSyncing && (
+                <div 
+                  className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground/70 hover:text-muted-foreground cursor-pointer transition-colors"
+                  onClick={syncMessages}
+                  title="Clique para sincronizar novamente"
+                >
+                  <RefreshCw className="w-2.5 h-2.5" />
+                  <span>
+                    {(() => {
+                      const diffMs = Date.now() - lastSyncTime.getTime()
+                      const diffMins = Math.floor(diffMs / 60000)
+                      if (diffMins < 1) return 'agora'
+                      if (diffMins < 60) return `${diffMins}m`
+                      const diffHours = Math.floor(diffMins / 60)
+                      if (diffHours < 24) return `${diffHours}h`
+                      return lastSyncTime.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                    })()}
+                  </span>
+                </div>
+              )}
               
               {/* Reports Button */}
               <Link href="/reports">

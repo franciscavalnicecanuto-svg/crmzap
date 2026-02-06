@@ -143,10 +143,16 @@ export default function RemindersPage() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [searchTerm, selectedIndex, router])
   
-  // Reset selected index when filtered results change
+  // Bug fix #193: Reset selected index when filtered results change
+  // Also clamp to valid range to prevent out-of-bounds access
+  // Note: Uses ref pattern since filteredLeads is computed later
   useEffect(() => {
-    setSelectedIndex(0)
-  }, [filter, searchTerm])
+    setSelectedIndex(prev => {
+      const maxIndex = filteredLeadsRef.current.length - 1
+      if (maxIndex < 0) return 0
+      return Math.min(prev, maxIndex)
+    })
+  }, [filter, searchTerm, leads]) // Added leads dependency to catch markAsDone changes
 
   const clearReminder = (leadId: string) => {
     const updated = leads.map(l => 
@@ -296,6 +302,9 @@ export default function RemindersPage() {
   const getReminderStatus = (dateStr: string) => {
     const date = new Date(dateStr)
     if (date < now) return 'overdue'
+    // UX #206: Urgent status for reminders in next 30 minutes
+    const thirtyMinutesFromNow = new Date(now.getTime() + 30 * 60 * 1000)
+    if (date >= now && date <= thirtyMinutesFromNow) return 'urgent'
     if (date >= today && date < tomorrow) return 'today'
     return 'upcoming'
   }
@@ -498,9 +507,15 @@ export default function RemindersPage() {
         )}
 
         {/* Completed Reminders List (when filter is "completed") */}
+        {/* Bug fix #207: Filter completed reminders by 7 days to match stats.completed count */}
         {filter === 'completed' && (
           <div className="space-y-3">
-            {completedReminders.length === 0 ? (
+            {(() => {
+              const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+              const filteredCompleted = completedReminders.filter(r => 
+                new Date(r.completedAt) >= sevenDaysAgo
+              )
+              return filteredCompleted.length === 0 ? (
               <div className="text-center py-16">
                 <CheckCircle className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
                 <h2 className="text-lg font-medium mb-1">Nenhum lembrete completado</h2>
@@ -511,7 +526,7 @@ export default function RemindersPage() {
             ) : (
               <>
                 <div className="flex items-center justify-between text-sm text-muted-foreground mb-4">
-                  <span>Últimos {completedReminders.length} lembretes completados</span>
+                  <span>{filteredCompleted.length} lembrete{filteredCompleted.length !== 1 ? 's' : ''} completado{filteredCompleted.length !== 1 ? 's' : ''} (últimos 7 dias)</span>
                   <button
                     onClick={() => {
                       setCompletedReminders([])
@@ -522,7 +537,7 @@ export default function RemindersPage() {
                     Limpar histórico
                   </button>
                 </div>
-                {completedReminders.map((reminder, idx) => (
+                {filteredCompleted.map((reminder, idx) => (
                   <Card 
                     key={`completed-${reminder.leadId}-${idx}`}
                     className="p-4 bg-green-50/30 border-green-200/50"
@@ -558,7 +573,8 @@ export default function RemindersPage() {
                   </Card>
                 ))}
               </>
-            )}
+            )
+            })()}
           </div>
         )}
 
@@ -590,14 +606,15 @@ export default function RemindersPage() {
                   key={lead.id}
                   className={`p-4 transition-all hover:shadow-md cursor-pointer ${
                     completingId === lead.id 
-                      ? 'opacity-0 scale-95 translate-x-4 duration-400' 
+                      ? 'reminder-completing' 
                       : 'opacity-100 scale-100 translate-x-0 duration-200'
                   } ${
                     isSelected 
-                      ? 'ring-2 ring-green-500 shadow-md' 
+                      ? 'ring-2 ring-green-500 shadow-md keyboard-focused' 
                       : ''
                   } ${
                     status === 'overdue' ? 'border-red-300 bg-red-50/50' :
+                    status === 'urgent' ? 'border-orange-400 bg-orange-50/50 urgent-reminder-pulse' :
                     status === 'today' ? 'border-amber-300 bg-amber-50/50' :
                     ''
                   }`}
@@ -609,11 +626,14 @@ export default function RemindersPage() {
                     {/* Status Icon */}
                     <div className={`p-2 rounded-full ${
                       status === 'overdue' ? 'bg-red-100' :
+                      status === 'urgent' ? 'bg-orange-100 animate-pulse' :
                       status === 'today' ? 'bg-amber-100' :
                       'bg-blue-100'
                     }`}>
                       {status === 'overdue' ? (
                         <AlertCircle className="w-5 h-5 text-red-600" />
+                      ) : status === 'urgent' ? (
+                        <Bell className="w-5 h-5 text-orange-600" />
                       ) : (
                         <Clock className={`w-5 h-5 ${
                           status === 'today' ? 'text-amber-600' : 'text-blue-600'
@@ -632,9 +652,11 @@ export default function RemindersPage() {
                       
                       <div className={`text-sm font-medium mb-1 ${
                         status === 'overdue' ? 'text-red-600' :
+                        status === 'urgent' ? 'text-orange-600' :
                         status === 'today' ? 'text-amber-600' :
                         'text-blue-600'
                       }`}>
+                        {status === 'urgent' && <span className="mr-1">⚡</span>}
                         {formatReminderDate(lead.reminderDate!)}
                       </div>
                       
@@ -653,9 +675,48 @@ export default function RemindersPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2">
-                      {/* UX #78/#82/#95: Quick Snooze buttons for passed reminders with more options */}
+                      {/* UX #78/#82/#95/#222: Quick Snooze buttons for all reminders */}
                       {/* Bug fix #95: Use local timezone-aware date formatting instead of toISOString() */}
                       {/* Bug fix #99: Moved helper functions outside render loop for better performance */}
+                      {/* UX #222: Added snooze for today/upcoming reminders too (only +1h, +1d) */}
+                      {(status === 'today' || status === 'upcoming' || status === 'urgent') && (
+                        <div className="flex items-center gap-1">
+                          {[
+                            { label: '+1h', ms: 60 * 60 * 1000, title: 'Adiar 1 hora' },
+                            { label: '+1d', ms: 24 * 60 * 60 * 1000, title: 'Adiar 1 dia' },
+                          ].map((option) => (
+                            <Button
+                              key={option.label}
+                              variant="ghost"
+                              size="sm"
+                              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-2 h-7 text-xs active:scale-95 transition-transform snooze-btn"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                const currentDate = new Date(lead.reminderDate!)
+                                const targetDate = new Date(currentDate.getTime() + option.ms)
+                                
+                                // Format as local ISO string
+                                const year = targetDate.getFullYear()
+                                const month = String(targetDate.getMonth() + 1).padStart(2, '0')
+                                const day = String(targetDate.getDate()).padStart(2, '0')
+                                const hours = String(targetDate.getHours()).padStart(2, '0')
+                                const minutes = String(targetDate.getMinutes()).padStart(2, '0')
+                                const newDate = `${year}-${month}-${day}T${hours}:${minutes}`
+                                
+                                const updated = leads.map(l => 
+                                  l.id === lead.id ? { ...l, reminderDate: newDate, reminderNote: l.reminderNote } : l
+                                )
+                                setLeads(updated)
+                                localStorage.setItem('whatszap-leads-v3', JSON.stringify(updated))
+                                if ('vibrate' in navigator) navigator.vibrate(10)
+                              }}
+                              title={option.title}
+                            >
+                              {option.label}
+                            </Button>
+                          ))}
+                        </div>
+                      )}
                       {status === 'overdue' && (
                         <div className="flex items-center gap-1 flex-wrap">
                           {[

@@ -52,6 +52,36 @@ interface ChatPanelProps {
   onOpenReminder?: () => void // Open reminder modal
 }
 
+// UX #221: Helper to render clickable links in messages
+const renderTextWithLinks = (text: string, fromMe: boolean) => {
+  // URL regex that matches common URL patterns
+  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi
+  const parts = text.split(urlRegex)
+  
+  return parts.map((part, i) => {
+    if (urlRegex.test(part)) {
+      // Reset regex lastIndex since we used it in split
+      urlRegex.lastIndex = 0
+      const href = part.startsWith('http') ? part : `https://${part}`
+      return (
+        <a
+          key={i}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`underline underline-offset-2 hover:opacity-80 transition-opacity ${
+            fromMe ? 'text-green-100' : 'text-blue-600 dark:text-blue-400'
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {part.length > 40 ? part.slice(0, 40) + '...' : part}
+        </a>
+      )
+    }
+    return part
+  })
+}
+
 // Helper to render media messages with icons
 // Bug fix #32: Only treat known media markers as media (not arbitrary text starting with [)
 // Bug fix #45: Added English variants (location, image, document, etc.) for Evolution API compatibility
@@ -122,7 +152,8 @@ const renderMessageContent = (text: string, fromMe: boolean) => {
     )
   }
   
-  return <span className="whitespace-pre-wrap break-words">{text}</span>
+  // UX #221: Render text with clickable links
+  return <span className="whitespace-pre-wrap break-words">{renderTextWithLinks(text, fromMe)}</span>
 }
 
 export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onOpenTags, onOpenReminder }: ChatPanelProps) {
@@ -1587,11 +1618,14 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
               aria-label="Campo de mensagem. Enter para enviar, Shift+Enter para nova linha"
             />
             {/* UX #68: Character counter when message is getting long */}
+            {/* UX #220: WhatsApp has ~4096 char limit - show warning near limit */}
             {newMessage.length > 100 && !isSending && (
-              <span className={`absolute bottom-1 right-2 text-[10px] ${
-                newMessage.length > 1000 ? 'text-amber-500' : 'text-muted-foreground'
+              <span className={`absolute bottom-1 right-2 text-[10px] transition-colors ${
+                newMessage.length > 3500 ? 'text-red-500 font-medium' : 
+                newMessage.length > 2000 ? 'text-amber-500' : 
+                newMessage.length > 1000 ? 'text-amber-400' : 'text-muted-foreground'
               }`}>
-                {newMessage.length}
+                {newMessage.length}{newMessage.length > 3500 && '/4096'}
               </span>
             )}
           </div>
