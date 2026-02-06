@@ -1818,7 +1818,7 @@ function DashboardContent() {
                                   )}
                                 </div>
                               )}
-                              {/* Quick Actions (on hover) - UX #100: Added mark as read button */}
+                              {/* Quick Actions (on hover) - UX #100 + UX #137: Added WhatsApp Web shortcut */}
                               <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition flex gap-0.5">
                                 {/* UX #100: Quick mark as read - only show if has unread */}
                                 {hasUnread && (
@@ -1835,6 +1835,17 @@ function DashboardContent() {
                                     <Check className="w-3 h-3 text-green-600" />
                                   </button>
                                 )}
+                                {/* UX #137: Quick open in WhatsApp Web/App */}
+                                <a
+                                  href={`https://wa.me/${lead.phone.replace(/\D/g, '')}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="p-1 rounded bg-background/80 hover:bg-green-100 transition"
+                                  title="Abrir no WhatsApp"
+                                >
+                                  <ExternalLink className="w-3 h-3 text-green-600" />
+                                </a>
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation()

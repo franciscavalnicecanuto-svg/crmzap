@@ -158,8 +158,10 @@ export function AISuggestions({ messages, leadName, onSelectSuggestion }: AISugg
   }, [])
   
   // Bug fix #130: Reset cooldown and suggestions when lead changes (detected via messages reset)
+  // Bug fix #133: Fixed dependency - use actual boolean, not expression result
+  const messagesEmpty = messages.length === 0
   useEffect(() => {
-    if (messages.length === 0) {
+    if (messagesEmpty) {
       setSuggestions([])
       setIntent(null)
       setIntentLabel(null)
@@ -170,7 +172,7 @@ export function AISuggestions({ messages, leadName, onSelectSuggestion }: AISugg
         cooldownIntervalRef.current = null
       }
     }
-  }, [messages.length === 0])
+  }, [messagesEmpty])
 
   // Bug fix #86: Auto-fetch with debounce when new message from client arrives
   useEffect(() => {

@@ -248,6 +248,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
 
   // Bug fix #92: Keyboard shortcuts for quick replies (Alt+1 through Alt+7)
   // UX #123: Added Ctrl+R to refresh messages, Ctrl+Shift+A to analyze
+  // UX #134: Added Escape to blur input when focused
   useEffect(() => {
     if (!lead || !isConnected) return
     
@@ -289,6 +290,12 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
         if (canAnalyzeNow && !isAnalyzing) {
           handleAnalyze()
         }
+        return
+      }
+      
+      // UX #134: Escape to blur input when focused
+      if (e.key === 'Escape' && document.activeElement?.tagName === 'TEXTAREA') {
+        ;(document.activeElement as HTMLElement).blur()
         return
       }
     }
@@ -1012,16 +1019,16 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
             </Button>
           </div>
         ) : messages.length === 0 ? (
-          // UX #69: Improved empty state with conversation starters
+          // UX #69 + UX #135: Improved empty state with conversation starters and contextual tips
           <div className="flex flex-col items-center justify-center h-full text-center p-6">
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-green-100 to-emerald-100 flex items-center justify-center mb-4 shadow-sm">
               <Send className="w-7 h-7 text-green-500" />
             </div>
             <h3 className="font-medium text-base mb-1">Iniciar conversa</h3>
             <p className="text-muted-foreground text-sm mb-4 max-w-[200px]">
               Seja o primeiro a enviar uma mensagem para {lead?.name?.split(' ')[0] || 'este contato'}
             </p>
-            <div className="flex flex-wrap gap-2 justify-center max-w-[280px]">
+            <div className="flex flex-wrap gap-2 justify-center max-w-[280px] mb-4">
               {[
                 '👋 Olá! Tudo bem?',
                 '📞 Posso te ligar?',
@@ -1029,12 +1036,21 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
               ].map((starter, idx) => (
                 <button
                   key={idx}
-                  onClick={() => setNewMessage(starter)}
-                  className="px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-full text-xs transition-colors border border-green-200"
+                  onClick={() => {
+                    setNewMessage(starter)
+                    // Haptic feedback
+                    if ('vibrate' in navigator) navigator.vibrate(10)
+                  }}
+                  className="px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 rounded-full text-xs transition-all border border-green-200 hover:shadow-sm active:scale-95"
                 >
                   {starter}
                 </button>
               ))}
+            </div>
+            {/* UX #135: Contextual tips */}
+            <div className="text-[10px] text-muted-foreground/70 space-y-1 max-w-[220px]">
+              <p>💡 Dica: Use <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">Alt+1-7</kbd> para respostas rápidas</p>
+              <p>⌨️ <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">Enter</kbd> envia, <kbd className="px-1 py-0.5 bg-muted rounded text-[9px]">Shift+Enter</kbd> nova linha</p>
             </div>
           </div>
         ) : (

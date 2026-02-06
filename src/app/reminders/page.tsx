@@ -439,6 +439,7 @@ export default function RemindersPage() {
                       {status === 'overdue' && (
                         <div className="flex items-center gap-1 flex-wrap">
                           {[
+                            { label: '30m', ms: 30 * 60 * 1000, title: 'Adiar 30 minutos' },
                             { label: '1h', ms: 60 * 60 * 1000, title: 'Adiar 1 hora' },
                             { label: '3h', ms: 3 * 60 * 60 * 1000, title: 'Adiar 3 horas' },
                             { label: 'Amanhã', ms: 'tomorrow' as const, title: 'Amanhã às 9h' },
