@@ -499,6 +499,67 @@ html {
   }
 }
 
+/* UX #320: New lead highlight animation */
+@keyframes new-lead-highlight {
+  0% {
+    background-color: rgba(34, 197, 94, 0.3);
+    transform: scale(1.02);
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+  }
+  100% {
+    background-color: transparent;
+    transform: scale(1);
+    box-shadow: none;
+  }
+}
+
+.new-lead-highlight {
+  animation: new-lead-highlight 1.5s ease-out;
+}
+
+/* UX #321: Last sync indicator pulse */
+@keyframes sync-indicator-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.sync-stale {
+  animation: sync-indicator-pulse 2s ease-in-out infinite;
+}
+
+/* UX #322: VIP badge glow effect */
+@keyframes vip-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(168, 85, 247, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(168, 85, 247, 0.6);
+  }
+}
+
+.vip-badge-glow {
+  animation: vip-glow 2s ease-in-out infinite;
+}
+
+/* UX #323: Days in column badge */
+.days-badge {
+  font-variant-numeric: tabular-nums;
+}
+
+.days-badge-warning {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.2), rgba(245, 158, 11, 0.3));
+  border-color: rgba(251, 191, 36, 0.5);
+}
+
+.days-badge-danger {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(220, 38, 38, 0.3));
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
 .scroll-button-pulse {
   animation: scroll-button-pulse 1.2s ease-in-out infinite;
 }

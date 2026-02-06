@@ -1299,6 +1299,22 @@ function DashboardContent() {
           setShowReminderModal(true)
           return
         }
+        // UX #320: 'v' to toggle VIP tag quickly
+        if (e.key === 'v') {
+          e.preventDefault()
+          const hasVip = selectedLead.tags?.includes('VIP')
+          toggleTag(selectedLead.id, 'VIP')
+          showToast(hasVip ? 'VIP removido' : '⭐ Marcado como VIP', hasVip ? 'info' : 'success')
+          return
+        }
+        // UX #321: 'u' to toggle Urgent tag quickly
+        if (e.key === 'u') {
+          e.preventDefault()
+          const hasUrgent = selectedLead.tags?.includes('Urgente')
+          toggleTag(selectedLead.id, 'Urgente')
+          showToast(hasUrgent ? 'Urgente removido' : '🔥 Marcado como Urgente', hasUrgent ? 'info' : 'success')
+          return
+        }
         // 'Enter' to open chat on mobile
         if (e.key === 'Enter' && isMobile && !showChat) {
           e.preventDefault()
@@ -1583,17 +1599,37 @@ function DashboardContent() {
                   </Link>
                 )
               })()}
-              {/* UX #268: Quick sync button */}
+              {/* UX #268 + UX #320: Quick sync button with last sync indicator */}
               {isConnected && !isSyncing && (
-                <Button 
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 w-7 p-0 hover:bg-green-50 hover:text-green-600"
-                  onClick={syncMessages}
-                  title="Sincronizar mensagens"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  {/* UX #320: Last sync indicator */}
+                  {lastSyncTime && (
+                    <span 
+                      className={`text-[9px] text-muted-foreground hidden sm:inline ${
+                        Date.now() - lastSyncTime.getTime() > 30 * 60 * 1000 ? 'sync-stale text-amber-500' : ''
+                      }`}
+                      title={`Última sincronização: ${lastSyncTime.toLocaleTimeString('pt-BR')}`}
+                    >
+                      {(() => {
+                        const diffMins = Math.floor((Date.now() - lastSyncTime.getTime()) / 60000)
+                        if (diffMins < 1) return '< 1m'
+                        if (diffMins < 60) return `${diffMins}m`
+                        const diffHours = Math.floor(diffMins / 60)
+                        if (diffHours < 24) return `${diffHours}h`
+                        return `${Math.floor(diffHours / 24)}d`
+                      })()}
+                    </span>
+                  )}
+                  <Button 
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 w-7 p-0 hover:bg-green-50 hover:text-green-600"
+                    onClick={syncMessages}
+                    title={lastSyncTime ? `Última sync: ${lastSyncTime.toLocaleTimeString('pt-BR')}. Clique para sincronizar` : 'Sincronizar mensagens'}
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
               )}
               {isSyncing && (
                 <Button 
@@ -2836,12 +2872,30 @@ function DashboardContent() {
                 )}
               </div>
               <div>
-                <label className="text-xs text-muted-foreground mb-1 block">Nota (opcional)</label>
+                <label className="text-xs text-muted-foreground mb-1 block flex items-center justify-between">
+                  <span>Nota (opcional)</span>
+                  {/* UX #322: Character counter for reminder note */}
+                  {reminderNote.length > 50 && (
+                    <span className={`text-[9px] font-mono ${
+                      reminderNote.length > 180 ? 'text-red-500' : 
+                      reminderNote.length > 120 ? 'text-amber-500' : 
+                      'text-muted-foreground'
+                    }`}>
+                      {reminderNote.length}/200
+                    </span>
+                  )}
+                </label>
                 <Input
                   placeholder="Ex: Ligar sobre orçamento"
                   value={reminderNote}
-                  onChange={e => setReminderNote(e.target.value)}
-                  className="text-sm"
+                  onChange={e => {
+                    // UX #322: Limit note to 200 characters
+                    if (e.target.value.length <= 200) {
+                      setReminderNote(e.target.value)
+                    }
+                  }}
+                  className={`text-sm ${reminderNote.length > 180 ? 'border-amber-300' : ''}`}
+                  maxLength={200}
                 />
               </div>
             </div>
