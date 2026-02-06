@@ -1497,6 +1497,39 @@ function DashboardContent() {
             </div>
             
             <div className="flex items-center gap-1">
+              {/* UX #281: Attention needed badge - shows cooling leads + overdue reminders */}
+              {(() => {
+                const overdueCount = leads.filter(l => l.reminderDate && new Date(l.reminderDate) < new Date()).length
+                const coolingCount = coolingLeads.length
+                const totalAttention = overdueCount + coolingCount
+                
+                if (totalAttention === 0) return null
+                
+                return (
+                  <Link href="/reminders">
+                    <Button 
+                      variant="ghost"
+                      size="sm"
+                      className={`h-7 px-2 text-xs gap-1 ${
+                        overdueCount > 0 
+                          ? 'text-red-600 hover:bg-red-50 hover:text-red-700' 
+                          : 'text-amber-600 hover:bg-amber-50 hover:text-amber-700'
+                      }`}
+                      title={`${overdueCount} lembrete${overdueCount !== 1 ? 's' : ''} atrasado${overdueCount !== 1 ? 's' : ''}, ${coolingCount} lead${coolingCount !== 1 ? 's' : ''} esfriando`}
+                    >
+                      <AlertCircle className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Atenção</span>
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                        overdueCount > 0 
+                          ? 'bg-red-100 text-red-700' 
+                          : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {totalAttention}
+                      </span>
+                    </Button>
+                  </Link>
+                )
+              })()}
               {/* UX #180: Last sync indicator */}
               {lastSyncTime && (
                 <div className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground mr-1" title={`Última sincronização: ${lastSyncTime.toLocaleString('pt-BR')}`}>
