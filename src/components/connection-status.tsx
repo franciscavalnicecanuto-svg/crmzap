@@ -93,8 +93,8 @@ export function ConnectionStatus({ state, className = '', onRetry }: ConnectionS
               {retryCount > 0 && <span className="text-[10px] opacity-70">({retryCount})</span>}
             </button>
           )}
-          {/* UX #178: Show reconnect link immediately on mobile, or after 1 retry on desktop */}
-          {(retryCount >= 1 || window.innerWidth < 640) && (
+          {/* UX #178 + Bug fix #800: Show reconnect link after 1 retry (avoid hydration mismatch with window.innerWidth) */}
+          {retryCount >= 1 && (
             <Link 
               href="/connect" 
               className="ml-1 px-2 py-1 bg-white/20 hover:bg-white/30 rounded text-[10px] font-semibold transition-colors min-h-[28px] flex items-center touch-manipulation"
