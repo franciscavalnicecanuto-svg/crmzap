@@ -16,6 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { TemplateButton } from '@/components/message-templates'
 import { AISuggestions } from '@/components/ai-suggestions'
 import { logAction } from '@/components/action-history'
+import { ContactTypingIndicator } from '@/components/typing-indicator'
 
 // Message skeleton for loading state
 const MessageSkeleton = ({ fromMe = false }: { fromMe?: boolean }) => (
@@ -53,15 +54,15 @@ interface ChatPanelProps {
 }
 
 // UX #221: Helper to render clickable links in messages
+// Bug fix #300: Use non-global regex for URL detection to avoid lastIndex issues
 const renderTextWithLinks = (text: string, fromMe: boolean) => {
-  // URL regex that matches common URL patterns
-  const urlRegex = /(https?:\/\/[^\s]+|www\.[^\s]+)/gi
-  const parts = text.split(urlRegex)
+  // URL regex that matches common URL patterns (non-global for split, separate for test)
+  const urlPattern = /(https?:\/\/[^\s]+|www\.[^\s]+)/i
+  const parts = text.split(urlPattern)
   
   return parts.map((part, i) => {
-    if (urlRegex.test(part)) {
-      // Reset regex lastIndex since we used it in split
-      urlRegex.lastIndex = 0
+    // Check if this part is a URL (test with non-global regex)
+    if (urlPattern.test(part)) {
       const href = part.startsWith('http') ? part : `https://${part}`
       return (
         <a
@@ -1464,6 +1465,13 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
                 </div>
               </div>
             ))}
+            {/* UX #310: Show typing indicator when last message is from us (simulating response wait) */}
+            {messages.length > 0 && messages[messages.length - 1]?.fromMe && (
+              <ContactTypingIndicator 
+                contactName={lead?.name || 'Contato'} 
+                isTyping={false} // Would be true when Evolution API supports typing status
+              />
+            )}
             <div ref={messagesEndRef} />
           </div>
         )}

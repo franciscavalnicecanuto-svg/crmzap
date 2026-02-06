@@ -1073,3 +1073,225 @@ textarea:focus::placeholder {
 .drag-handle:active {
   cursor: grabbing;
 }
+
+/* UX #301: Reminder column attention indicator */
+@keyframes reminder-column-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 12px 4px rgba(239, 68, 68, 0.1);
+  }
+}
+
+.reminder-column-active {
+  animation: reminder-column-pulse 2s ease-in-out infinite;
+}
+
+/* UX #302: Enhanced delete zone with bounce and glow */
+@keyframes delete-zone-glow {
+  0%, 100% {
+    box-shadow: 0 8px 25px rgba(239, 68, 68, 0.3);
+  }
+  50% {
+    box-shadow: 0 12px 35px rgba(239, 68, 68, 0.5);
+  }
+}
+
+.delete-zone-glow {
+  animation: delete-zone-glow 1.5s ease-in-out infinite;
+}
+
+/* UX #303: Typing indicator for chat */
+@keyframes typing-bounce {
+  0%, 80%, 100% { 
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  40% { 
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+.typing-indicator span {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 2px;
+  background-color: currentColor;
+  border-radius: 50%;
+  animation: typing-bounce 1.4s ease-in-out infinite;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* UX #310: Swipe gesture feedback */
+@keyframes swipe-hint {
+  0%, 100% { transform: translateX(0); opacity: 0.5; }
+  50% { transform: translateX(8px); opacity: 1; }
+}
+
+.swipe-hint {
+  animation: swipe-hint 2s ease-in-out infinite;
+}
+
+/* UX #311: Enhanced contact typing animation */
+.contact-typing .typing-indicator span {
+  width: 6px;
+  height: 6px;
+  background-color: oklch(0.6 0.02 240);
+  animation: typing-bounce 1.4s ease-in-out infinite;
+}
+
+/* UX #312: Message status transition */
+.message-status-icon {
+  transition: all 0.2s ease;
+}
+
+.message-status-icon.status-change {
+  animation: status-change-pop 0.3s ease-out;
+}
+
+@keyframes status-change-pop {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* UX #314: Better mobile card swipe */
+.swipeable-card {
+  touch-action: pan-y pinch-zoom;
+  transition: transform 0.2s ease-out;
+}
+
+.swipeable-card.swiping {
+  transition: none;
+}
+
+/* UX #315: Pull-to-refresh enhanced */
+@keyframes pull-refresh-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.pull-refresh-active {
+  animation: pull-refresh-spin 0.8s linear infinite;
+}
+
+/* UX #316: Better loading skeleton for messages */
+@keyframes message-skeleton-wave {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.message-skeleton {
+  background: linear-gradient(
+    90deg,
+    oklch(0.9 0.01 240) 25%,
+    oklch(0.85 0.01 240) 50%,
+    oklch(0.9 0.01 240) 75%
+  );
+  background-size: 400% 100%;
+  animation: message-skeleton-wave 1.5s ease-in-out infinite;
+}
+
+/* UX #317: Voice message waveform animation */
+@keyframes waveform-pulse {
+  0%, 100% { transform: scaleY(0.5); opacity: 0.5; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+.waveform-bar {
+  animation: waveform-pulse 0.8s ease-in-out infinite;
+}
+
+.waveform-bar:nth-child(odd) {
+  animation-delay: 0.1s;
+}
+
+/* UX #318: Smooth image loading placeholder */
+.image-loading {
+  background: linear-gradient(
+    135deg,
+    oklch(0.9 0.01 240) 0%,
+    oklch(0.85 0.01 240) 100%
+  );
+  position: relative;
+  overflow: hidden;
+}
+
+.image-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    transparent 100%
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+/* UX #319: Better action confirmation */
+@keyframes action-confirm {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); background-color: oklch(0.55 0.18 145 / 0.2); }
+  100% { transform: scale(1); }
+}
+
+.action-confirmed {
+  animation: action-confirm 0.4s ease-out;
+}
+
+/* UX #320: Improved chat bubble tail */
+.chat-bubble-tail::after {
+  content: '';
+  position: absolute;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  background: inherit;
+  clip-path: polygon(0 0, 100% 100%, 100% 0);
+}
+
+.chat-bubble-tail.from-me::after {
+  right: -4px;
+  transform: rotate(45deg);
+}
+
+.chat-bubble-tail.from-them::after {
+  left: -4px;
+  transform: rotate(-45deg);
+}
+
+/* UX #321: Better online status indicator */
+@keyframes online-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(34, 197, 94, 0);
+  }
+}
+
+.online-indicator {
+  animation: online-pulse 2s infinite;
+}
+
+/* UX #322: Message timestamp fade */
+.message-timestamp {
+  opacity: 0.7;
+  transition: opacity 0.15s ease;
+}
+
+.message:hover .message-timestamp {
+  opacity: 1;
+}

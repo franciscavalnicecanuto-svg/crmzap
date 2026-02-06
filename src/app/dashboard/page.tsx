@@ -312,6 +312,44 @@ function ChatPanelWrapper({
   )
 }
 
+// UX #302: Enhanced Delete Zone with hover feedback and animation
+function DeleteZone({ onDrop }: { onDrop: (e: React.DragEvent) => void }) {
+  const [isHovering, setIsHovering] = useState(false)
+  
+  return (
+    <div 
+      className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in-0 duration-300"
+      data-delete-zone="true"
+      onDragOver={(e) => { 
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        setIsHovering(true)
+      }}
+      onDragLeave={() => setIsHovering(false)}
+      onDrop={(e) => {
+        setIsHovering(false)
+        onDrop(e)
+      }}
+    >
+      <div className={`flex items-center gap-2 px-6 py-3 rounded-full shadow-2xl transition-all duration-200 ${
+        isHovering 
+          ? 'bg-red-600 scale-110 shadow-red-500/50' 
+          : 'bg-red-500 animate-pulse'
+      }`}>
+        <div className={`relative ${isHovering ? 'animate-bounce' : ''}`}>
+          <Trash2 className="w-5 h-5 text-white" />
+          {isHovering && (
+            <span className="absolute -top-1 -right-1 w-2 h-2 bg-white rounded-full animate-ping" />
+          )}
+        </div>
+        <span className={`font-medium text-white transition-all ${isHovering ? 'text-lg' : ''}`}>
+          {isHovering ? '🗑️ Solte para deletar!' : 'Solte aqui para remover'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function DashboardContent() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [search, setSearch] = useState('')
@@ -2500,19 +2538,9 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* Delete Zone - appears when dragging */}
+        {/* Delete Zone - UX #302: Enhanced delete zone with better feedback */}
         {showDeleteZone && (
-          <div 
-            className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50"
-            data-delete-zone="true"
-            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move' }}
-            onDrop={handleDropDelete}
-          >
-            <div className="flex items-center gap-2 px-6 py-3 bg-red-500 text-white rounded-full shadow-lg animate-pulse">
-              <Trash2 className="w-5 h-5" />
-              <span className="font-medium">Solte aqui para remover</span>
-            </div>
-          </div>
+          <DeleteZone onDrop={handleDropDelete} />
         )}
         
         {/* Mobile: drag desabilitado por enquanto, apenas tap para abrir chat */}

@@ -51,11 +51,54 @@ export function ReminderNotification({
     return () => clearInterval(timer)
   }, [onDismiss])
 
-  // Play notification sound
+  // Play notification sound with fallback
+  // Bug fix #301: Handle missing audio file gracefully with Web Audio API beep fallback
   useEffect(() => {
-    audioRef.current = new Audio('/notification.mp3')
-    audioRef.current.volume = 0.5
-    audioRef.current.play().catch(() => {})
+    const playSound = async () => {
+      try {
+        // Try to play the audio file first
+        audioRef.current = new Audio('/notification.mp3')
+        audioRef.current.volume = 0.5
+        await audioRef.current.play()
+      } catch {
+        // Fallback: Generate a simple beep using Web Audio API
+        try {
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+          const oscillator = audioContext.createOscillator()
+          const gainNode = audioContext.createGain()
+          
+          oscillator.connect(gainNode)
+          gainNode.connect(audioContext.destination)
+          
+          oscillator.frequency.value = 800
+          oscillator.type = 'sine'
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime)
+          gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+          
+          oscillator.start(audioContext.currentTime)
+          oscillator.stop(audioContext.currentTime + 0.3)
+          
+          // Play a second beep after a short delay
+          setTimeout(() => {
+            const osc2 = audioContext.createOscillator()
+            const gain2 = audioContext.createGain()
+            osc2.connect(gain2)
+            gain2.connect(audioContext.destination)
+            osc2.frequency.value = 1000
+            osc2.type = 'sine'
+            gain2.gain.setValueAtTime(0.3, audioContext.currentTime)
+            gain2.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3)
+            osc2.start(audioContext.currentTime)
+            osc2.stop(audioContext.currentTime + 0.3)
+          }, 150)
+        } catch {
+          // Web Audio not available - vibrate as last resort
+          if ('vibrate' in navigator) navigator.vibrate([100, 50, 100])
+        }
+      }
+    }
+    
+    playSound()
 
     return () => {
       audioRef.current?.pause()
