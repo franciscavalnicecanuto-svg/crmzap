@@ -588,8 +588,9 @@ export default function RemindersPage() {
                                 const minutes = String(targetDate.getMinutes()).padStart(2, '0')
                                 const newDate = `${year}-${month}-${day}T${hours}:${minutes}`
                                 
+                                // Bug fix #156: Preserve reminderNote when snoozing
                                 const updated = leads.map(l => 
-                                  l.id === lead.id ? { ...l, reminderDate: newDate } : l
+                                  l.id === lead.id ? { ...l, reminderDate: newDate, reminderNote: l.reminderNote } : l
                                 )
                                 setLeads(updated)
                                 localStorage.setItem('whatszap-leads-v3', JSON.stringify(updated))

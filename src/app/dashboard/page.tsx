@@ -1136,6 +1136,81 @@ function DashboardContent() {
 
   const getLeadsByStatus = (status: LeadStatus) => 
     filteredLeads.filter(lead => lead.status === status)
+
+  // UX #157: Arrow key navigation between leads (must be after filteredLeads is defined)
+  useEffect(() => {
+    const handleArrowNavigation = (e: KeyboardEvent) => {
+      // Skip if typing in an input
+      const tagName = (e.target as HTMLElement)?.tagName
+      const isInput = tagName === 'INPUT' || tagName === 'TEXTAREA'
+      
+      // Skip if any modal is open
+      if (isInput || showTagModal || showReminderModal || showDeleteConfirm) return
+      
+      // Arrow key or vim-style navigation
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'j' || e.key === 'k') {
+        e.preventDefault()
+        const direction = (e.key === 'ArrowDown' || e.key === 'j') ? 1 : -1
+        
+        if (filteredLeads.length === 0) return
+        
+        if (!selectedLead) {
+          // No lead selected - select first or last
+          const lead = direction === 1 ? filteredLeads[0] : filteredLeads[filteredLeads.length - 1]
+          setSelectedLead(lead)
+          setShowChat(true)
+          if ('vibrate' in navigator) navigator.vibrate(5)
+        } else {
+          // Find current index and move
+          const currentIndex = filteredLeads.findIndex(l => l.id === selectedLead.id)
+          if (currentIndex === -1) {
+            setSelectedLead(filteredLeads[0])
+            setShowChat(true)
+          } else {
+            const newIndex = Math.max(0, Math.min(filteredLeads.length - 1, currentIndex + direction))
+            if (newIndex !== currentIndex) {
+              setSelectedLead(filteredLeads[newIndex])
+              setShowChat(true)
+              // Scroll the card into view
+              const card = document.querySelector(`[data-lead-id="${filteredLeads[newIndex].id}"]`)
+              card?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+              if ('vibrate' in navigator) navigator.vibrate(5)
+            }
+          }
+        }
+        return
+      }
+      
+      // Quick actions with keyboard when a lead is selected
+      if (selectedLead) {
+        // 't' to open tags
+        if (e.key === 't') {
+          e.preventDefault()
+          setTagLead(selectedLead)
+          setShowTagModal(true)
+          return
+        }
+        // 'r' to open reminder
+        if (e.key === 'r') {
+          e.preventDefault()
+          setReminderLead(selectedLead)
+          setReminderDate('')
+          setReminderNote(selectedLead.reminderNote || '')
+          setShowReminderModal(true)
+          return
+        }
+        // 'Enter' to open chat on mobile
+        if (e.key === 'Enter' && isMobile && !showChat) {
+          e.preventDefault()
+          setShowChat(true)
+          return
+        }
+      }
+    }
+    
+    window.addEventListener('keydown', handleArrowNavigation)
+    return () => window.removeEventListener('keydown', handleArrowNavigation)
+  }, [filteredLeads, selectedLead, showTagModal, showReminderModal, showDeleteConfirm, isMobile, showChat])
     
   // Metrics calculations
   const metrics = {
@@ -1725,6 +1800,7 @@ function DashboardContent() {
                           return (
                             <Card 
                               key={lead.id}
+                              data-lead-id={lead.id}
                               className={`${settings.compactView ? 'p-1.5' : 'p-2'} cursor-pointer hover:shadow-md transition-all active:scale-[0.97] active:bg-gray-100 group relative min-h-[44px] touch-manipulation lead-card-hover ${
                                 selectedLead?.id === lead.id 
                                   ? 'ring-2 ring-green-500 shadow-md' 

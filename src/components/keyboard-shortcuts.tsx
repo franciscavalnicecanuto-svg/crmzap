@@ -17,8 +17,18 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     title: 'Navegação',
     shortcuts: [
       { keys: ['Ctrl', 'K'], description: 'Buscar leads' },
-      { keys: ['Esc'], description: 'Fechar painel/modal' },
       { keys: ['↑', '↓'], description: 'Navegar entre leads' },
+      { keys: ['j', 'k'], description: 'Navegar entre leads (vim)' },
+      { keys: ['Esc'], description: 'Fechar painel/modal' },
+      { keys: ['?'], description: 'Mostrar atalhos' },
+    ]
+  },
+  {
+    title: 'Lead Selecionado',
+    shortcuts: [
+      { keys: ['t'], description: 'Abrir tags' },
+      { keys: ['r'], description: 'Criar/editar lembrete' },
+      { keys: ['Enter'], description: 'Abrir conversa' },
     ]
   },
   {
@@ -27,6 +37,8 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: ['Enter'], description: 'Enviar mensagem' },
       { keys: ['Shift', 'Enter'], description: 'Nova linha' },
       { keys: ['Alt', '1-7'], description: 'Respostas rápidas' },
+      { keys: ['Ctrl', 'R'], description: 'Atualizar mensagens' },
+      { keys: ['Ctrl', 'Shift', 'A'], description: 'Analisar com IA' },
     ]
   },
   {
@@ -34,13 +46,6 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
     shortcuts: [
       { keys: ['Ctrl', 'T'], description: 'Abrir templates' },
       { keys: ['Esc'], description: 'Fechar templates' },
-    ]
-  },
-  {
-    title: 'Ações',
-    shortcuts: [
-      { keys: ['Ctrl', 'R'], description: 'Sincronizar mensagens' },
-      { keys: ['Ctrl', 'N'], description: 'Novo lembrete' },
     ]
   }
 ]

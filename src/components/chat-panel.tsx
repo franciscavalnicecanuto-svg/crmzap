@@ -664,9 +664,26 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
     }
   }
 
+  // UX #158: Enhanced time formatting with relative time for recent messages
   const formatTime = (timestamp: string | null) => {
     if (!timestamp) return ''
     const date = new Date(timestamp)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    
+    // For very recent messages (< 1h), show relative time
+    if (diffMs >= 0 && diffMins < 60) {
+      if (diffMins < 1) return 'agora'
+      return `há ${diffMins}min`
+    }
+    
+    // For today, show time
+    if (date.toDateString() === now.toDateString()) {
+      return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    }
+    
+    // For older messages, show date + time
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
   }
   
