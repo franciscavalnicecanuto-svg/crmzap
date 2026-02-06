@@ -381,6 +381,7 @@ function DashboardContent() {
   // New states for features
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | '7days' | '30days'>('all')
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<LeadStatus | 'all'>('all') // UX #282: Filter by status
   const [showUnreadOnly, setShowUnreadOnly] = useState(false) // UX improvement #49: Filter unread messages
   const searchInputRef = useRef<HTMLInputElement>(null) // UX improvement #50: Keyboard shortcut ref
   const [showReminderModal, setShowReminderModal] = useState(false)
@@ -1171,8 +1172,10 @@ function DashboardContent() {
     const matchesTag = !tagFilter || lead.tags?.includes(tagFilter)
     // UX #49: Filter by unread status
     const matchesUnread = !showUnreadOnly || hasUnreadMessages(lead)
-    return matchesSearch && matchesDate && matchesTag && matchesUnread
-  }), [leads, debouncedSearch, tagFilter, dateFilter, showUnreadOnly])
+    // UX #282: Filter by status
+    const matchesStatus = statusFilter === 'all' || lead.status === statusFilter
+    return matchesSearch && matchesDate && matchesTag && matchesUnread && matchesStatus
+  }), [leads, debouncedSearch, tagFilter, dateFilter, showUnreadOnly, statusFilter])
 
   // UX #265: Sort leads by last activity (most recent first) + unread on top
   const getLeadsByStatus = (status: LeadStatus) => 
@@ -1357,10 +1360,22 @@ function DashboardContent() {
   }
   
   // Clear reminder
+  // Bug fix #283: Also remove from notified reminders to allow re-scheduling
   const clearReminder = (leadId: string) => {
     setLeads(prev => prev.map(l => 
       l.id === leadId ? { ...l, reminderDate: undefined, reminderNote: undefined } : l
     ))
+    
+    // Bug fix #283: Remove from notified set so user can reschedule same lead
+    try {
+      const notifiedKey = 'whatszap-notified-reminders'
+      const notified = JSON.parse(localStorage.getItem(notifiedKey) || '[]')
+      const filtered = notified.filter((id: string) => id !== leadId)
+      localStorage.setItem(notifiedKey, JSON.stringify(filtered))
+    } catch (e) {
+      console.error('Failed to clear notified reminder:', e)
+    }
+    
     showToast('Lembrete removido', 'info')
   }
   
@@ -1907,6 +1922,40 @@ function DashboardContent() {
                 </DropdownMenuContent>
               </DropdownMenu>
               
+              {/* UX #282: Status Filter */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-6 text-xs px-2 gap-1">
+                    <Filter className="w-3 h-3" />
+                    {statusFilter === 'all' ? 'Status' : kanbanColumns.find(c => c.id === statusFilter)?.label || statusFilter}
+                    {statusFilter !== 'all' && (
+                      <Badge variant="secondary" className="ml-1 h-4 px-1 text-[10px]">
+                        {leads.filter(l => l.status === statusFilter).length}
+                      </Badge>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setStatusFilter('all')}>
+                    Todos os Status <span className="ml-auto text-muted-foreground">{leads.length}</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {kanbanColumns.filter(col => col.visible).map(col => {
+                    const count = leads.filter(l => l.status === col.id).length
+                    return (
+                      <DropdownMenuItem 
+                        key={col.id} 
+                        onClick={() => setStatusFilter(col.id as LeadStatus)}
+                        className={count === 0 ? 'opacity-50' : ''}
+                      >
+                        <span className={col.color}>{col.label}</span>
+                        <span className="ml-auto text-muted-foreground">{count}</span>
+                      </DropdownMenuItem>
+                    )
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
               {/* UX #209: Last sync indicator */}
               {lastSyncTime && !isSyncing && (
                 <div 
@@ -1979,6 +2028,7 @@ function DashboardContent() {
                 {search ? `Não encontramos resultados para "${search.trim()}"` : 
                  showUnreadOnly ? 'Não há mensagens não lidas no momento' :
                  tagFilter ? `Nenhum lead com a tag "${tagFilter}"` :
+                 statusFilter !== 'all' ? `Nenhum lead no status "${kanbanColumns.find(c => c.id === statusFilter)?.label || statusFilter}"` :
                  dateFilter !== 'all' ? `Nenhum lead criado neste período` :
                  'Tente ajustar seus filtros'}
               </p>
@@ -1995,8 +2045,8 @@ function DashboardContent() {
                     Ver todas
                   </Button>
                 )}
-                {(tagFilter || dateFilter !== 'all') && (
-                  <Button variant="outline" size="sm" onClick={() => { setTagFilter(null); setDateFilter('all') }}>
+                {(tagFilter || dateFilter !== 'all' || statusFilter !== 'all') && (
+                  <Button variant="outline" size="sm" onClick={() => { setTagFilter(null); setDateFilter('all'); setStatusFilter('all') }}>
                     <Filter className="w-3 h-3 mr-1" />
                     Limpar filtros
                   </Button>
@@ -2765,8 +2815,15 @@ function DashboardContent() {
                     const minutes = String(minDate.getMinutes()).padStart(2, '0')
                     return `${year}-${month}-${day}T${hours}:${minutes}`
                   })()}
-                  className="text-sm"
+                  className={`text-sm ${reminderDate && new Date(reminderDate) < new Date() ? 'border-red-300 bg-red-50 focus:ring-red-400' : ''}`}
                 />
+                {/* UX #284: Inline validation warning for past dates */}
+                {reminderDate && new Date(reminderDate) < new Date() && (
+                  <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3 h-3" />
+                    Data/hora no passado - escolha um horário futuro
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs text-muted-foreground mb-1 block">Nota (opcional)</label>
