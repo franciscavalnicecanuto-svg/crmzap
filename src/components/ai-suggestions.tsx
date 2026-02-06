@@ -269,14 +269,15 @@ export function AISuggestions({ messages, leadName, onSelectSuggestion }: AISugg
         </div>
       )}
 
-      {/* Empty State with Refresh */}
+      {/* Empty State with Refresh - UX #103: More prominent button */}
       {!isLoading && suggestions.length === 0 && messages.length > 0 && !error && (
         <button
           onClick={fetchSuggestions}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 hover:bg-purple-50 px-2 py-1.5 rounded-lg transition-all active:scale-95"
         >
           <Sparkles className="w-3 h-3" />
-          Gerar sugestões de resposta
+          <span>Gerar sugestões de resposta</span>
+          <span className="text-[10px] text-purple-400 hidden sm:inline">(IA)</span>
         </button>
       )}
     </div>

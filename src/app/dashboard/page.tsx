@@ -854,6 +854,9 @@ function DashboardContent() {
     const lead = leads.find(l => l.id === id)
     const oldStatus = lead?.status
     
+    // UX #101: Don't move if same status
+    if (oldStatus === newStatus) return
+    
     setLeads(prev => prev.map(lead => 
       lead.id === id ? { ...lead, status: newStatus } : lead
     ))
@@ -873,6 +876,13 @@ function DashboardContent() {
         leadName: lead.name,
         details: { from: oldStatus, to: newStatus }
       })
+      
+      // UX #101: Show visual feedback on move
+      const statusLabel = kanbanColumns.find(c => c.id === newStatus)?.label || newStatus
+      showToast(`${lead.name.split(' ')[0]} → ${statusLabel}`, 'success')
+      
+      // Haptic feedback on mobile
+      if ('vibrate' in navigator) navigator.vibrate([10, 30, 10])
     }
   }
 
@@ -1607,9 +1617,10 @@ function DashboardContent() {
         )}
 
         {/* Kanban Board - Only show when we have filtered results */}
+        {/* UX #105: Improved mobile scrolling with snap points and better touch handling */}
         {!isLoadingLeads && leads.length > 0 && filteredLeads.length > 0 && (
-          <div className="flex-1 overflow-x-auto overflow-y-hidden p-2 pb-4">
-            <div className="flex gap-2 h-full" style={{ minWidth: 'max-content', paddingRight: '8px' }}>
+          <div className="flex-1 overflow-x-auto overflow-y-hidden p-2 pb-4 snap-x snap-mandatory md:snap-none scroll-smooth">
+            <div className="flex gap-2 h-full touch-pan-x" style={{ minWidth: 'max-content', paddingRight: '8px' }}>
               {kanbanColumns.filter(col => col.visible).map((column) => {
                 const status = column.id as LeadStatus
                 const statusLeads = getLeadsByStatus(status)
@@ -1617,7 +1628,7 @@ function DashboardContent() {
                 return (
                   <div 
                     key={status}
-                    className={`flex-shrink-0 w-40 flex flex-col transition-all duration-150 ${
+                    className={`flex-shrink-0 w-44 md:w-40 flex flex-col transition-all duration-150 snap-start ${
                       dragOverColumn === status ? 'scale-[1.02] opacity-100' : draggedLead ? 'opacity-70' : ''
                     }`}
                     data-status={status}
@@ -1646,9 +1657,9 @@ function DashboardContent() {
                           return (
                             <Card 
                               key={lead.id}
-                              className={`${settings.compactView ? 'p-1' : 'p-1.5'} cursor-pointer hover:shadow-md transition-all active:scale-[0.98] active:bg-gray-100 group relative ${
+                              className={`${settings.compactView ? 'p-1.5' : 'p-2'} cursor-pointer hover:shadow-md transition-all active:scale-[0.97] active:bg-gray-100 group relative min-h-[44px] touch-manipulation ${
                                 selectedLead?.id === lead.id 
-                                  ? 'ring-2 ring-green-500' 
+                                  ? 'ring-2 ring-green-500 shadow-md' 
                                   : hasUnread 
                                     ? 'bg-green-50 border-green-300 shadow-sm' 
                                     : ''
@@ -1781,8 +1792,23 @@ function DashboardContent() {
                                   )}
                                 </div>
                               )}
-                              {/* Quick Actions (on hover) */}
+                              {/* Quick Actions (on hover) - UX #100: Added mark as read button */}
                               <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition flex gap-0.5">
+                                {/* UX #100: Quick mark as read - only show if has unread */}
+                                {hasUnread && (
+                                  <button 
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setReadLeads(prev => new Set([...prev, lead.id]))
+                                      // Haptic feedback
+                                      if ('vibrate' in navigator) navigator.vibrate(5)
+                                    }}
+                                    className="p-1 rounded bg-green-100 hover:bg-green-200 transition"
+                                    title="Marcar como lido"
+                                  >
+                                    <Check className="w-3 h-3 text-green-600" />
+                                  </button>
+                                )}
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation()

@@ -151,10 +151,13 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   const analysisAbortRef = useRef<AbortController | null>(null) // Bug fix #26: Abort analysis on unmount
   const analysisLeadIdRef = useRef<string | null>(null) // Bug fix #25: Track which lead analysis is for
 
-  // Scroll to bottom using scrollIntoView
+  // Scroll to bottom using scrollIntoView - UX #106: Improved reliability on mobile
   const scrollToBottom = (smooth = false) => {
-    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' })
-    setShowScrollButton(false)
+    // Use requestAnimationFrame for more reliable scrolling
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant', block: 'end' })
+      setShowScrollButton(false)
+    })
   }
 
   // Handle scroll to detect if user is at bottom
@@ -976,24 +979,24 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
       </div>
 
       {/* Quick Replies - Bug fix #23: Only show when connected */}
-      {/* UX #70: Improved quick replies with better visual feedback and keyboard accessibility */}
+      {/* UX #70/#102: Improved quick replies with better mobile scrolling and compact mode */}
       {lead && messages.length > 0 && isConnected && (
-        <div className="px-3 pt-2 border-t bg-gradient-to-r from-gray-50/80 to-green-50/30">
-          <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="px-2 pt-2 border-t bg-gradient-to-r from-gray-50/80 to-green-50/30">
+          <div className="flex gap-1 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory -mx-2 px-2">
             {[
-              { emoji: '👋', text: 'Olá! Tudo bem?', shortcut: '1' },
-              { emoji: '⏰', text: 'Um momento, por favor', shortcut: '2' },
-              { emoji: '✅', text: 'Perfeito!', shortcut: '3' },
-              { emoji: '📞', text: 'Posso te ligar?', shortcut: '4' },
-              { emoji: '📅', text: 'Podemos agendar?', shortcut: '5' },
-              { emoji: '💰', text: 'Vou verificar os valores', shortcut: '6' },
-              { emoji: '🙏', text: 'Obrigado pelo contato!', shortcut: '7' },
+              { emoji: '👋', text: 'Olá! Tudo bem?', short: 'Olá!', shortcut: '1' },
+              { emoji: '⏰', text: 'Um momento, por favor', short: 'Um momento', shortcut: '2' },
+              { emoji: '✅', text: 'Perfeito!', short: 'Perfeito!', shortcut: '3' },
+              { emoji: '📞', text: 'Posso te ligar?', short: 'Ligar?', shortcut: '4' },
+              { emoji: '📅', text: 'Podemos agendar?', short: 'Agendar?', shortcut: '5' },
+              { emoji: '💰', text: 'Vou verificar os valores', short: 'Ver valores', shortcut: '6' },
+              { emoji: '🙏', text: 'Obrigado pelo contato!', short: 'Obrigado!', shortcut: '7' },
             ].map((reply, idx) => (
               <Button
                 key={idx}
                 variant="outline"
                 size="sm"
-                className="h-7 px-2.5 text-xs whitespace-nowrap shrink-0 hover:bg-green-100 hover:border-green-400 hover:text-green-800 hover:shadow-sm active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:ring-offset-1"
+                className="h-8 px-2 text-xs whitespace-nowrap shrink-0 hover:bg-green-100 hover:border-green-400 hover:text-green-800 hover:shadow-sm active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:ring-offset-1 snap-start touch-manipulation min-w-[60px]"
                 onClick={() => {
                   setNewMessage(reply.text)
                   // UX: Haptic feedback
@@ -1003,8 +1006,9 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
                 title={`${reply.text} (Alt+${reply.shortcut})`}
                 aria-label={`Resposta rápida: ${reply.text}`}
               >
-                <span className="mr-1">{reply.emoji}</span>
-                {reply.text}
+                <span className="mr-0.5">{reply.emoji}</span>
+                <span className="hidden sm:inline">{reply.text}</span>
+                <span className="sm:hidden">{reply.short}</span>
               </Button>
             ))}
           </div>

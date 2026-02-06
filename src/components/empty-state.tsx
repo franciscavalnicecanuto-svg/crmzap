@@ -1,17 +1,18 @@
 'use client'
 
-import { MessageCircle, Users, Inbox, Search, Wifi, Download, ArrowRight, Sparkles, Zap } from 'lucide-react'
+import { MessageCircle, Users, Inbox, Search, Wifi, Download, ArrowRight, Sparkles, Zap, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface EmptyStateProps {
-  type: 'no-leads' | 'no-messages' | 'no-results' | 'not-connected'
+  type: 'no-leads' | 'no-messages' | 'no-results' | 'not-connected' | 'error'
   onAction?: () => void
   actionLabel?: string
   secondaryAction?: () => void
   secondaryLabel?: string
+  errorMessage?: string
 }
 
-export function EmptyState({ type, onAction, actionLabel, secondaryAction, secondaryLabel }: EmptyStateProps) {
+export function EmptyState({ type, onAction, actionLabel, secondaryAction, secondaryLabel, errorMessage }: EmptyStateProps) {
   const configs = {
     'no-leads': {
       icon: Users,
@@ -55,6 +56,18 @@ export function EmptyState({ type, onAction, actionLabel, secondaryAction, secon
         '📱 Abra o WhatsApp no celular',
         '⚙️ Vá em Configurações > Aparelhos conectados',
         '📷 Escaneie o QR Code na próxima tela'
+      ]
+    },
+    // UX #104: Error state for API failures
+    'error': {
+      icon: RefreshCw,
+      title: 'Algo deu errado',
+      description: errorMessage || 'Não foi possível carregar os dados. Tente novamente.',
+      gradient: 'from-red-500/20 to-orange-500/20',
+      tips: [
+        '🔄 Verifique sua conexão com a internet',
+        '📱 Confirme que o WhatsApp está conectado',
+        '⏱️ Aguarde alguns segundos e tente novamente'
       ]
     }
   }

@@ -344,65 +344,57 @@ export default function RemindersPage() {
                     <div className="flex items-center gap-2">
                       {/* UX #78/#82/#95: Quick Snooze buttons for passed reminders with more options */}
                       {/* Bug fix #95: Use local timezone-aware date formatting instead of toISOString() */}
+                      {/* Bug fix #99: Moved helper functions outside render loop for better performance */}
                       {status === 'overdue' && (
                         <div className="flex items-center gap-1 flex-wrap">
-                          {(() => {
-                            // Helper function to format date in local timezone for datetime-local input
-                            const toLocalISOString = (date: Date) => {
-                              const year = date.getFullYear()
-                              const month = String(date.getMonth() + 1).padStart(2, '0')
-                              const day = String(date.getDate()).padStart(2, '0')
-                              const hours = String(date.getHours()).padStart(2, '0')
-                              const minutes = String(date.getMinutes()).padStart(2, '0')
-                              return `${year}-${month}-${day}T${hours}:${minutes}`
-                            }
-                            
-                            // Helper function to get tomorrow 9am in local time
-                            const getTomorrow9am = () => {
-                              const tomorrow = new Date()
-                              tomorrow.setDate(tomorrow.getDate() + 1)
-                              tomorrow.setHours(9, 0, 0, 0)
-                              return toLocalISOString(tomorrow)
-                            }
-                            // Helper function to get next Monday 9am in local time
-                            const getNextMonday9am = () => {
-                              const today = new Date()
-                              const daysUntilMonday = (8 - today.getDay()) % 7 || 7
-                              const monday = new Date(today)
-                              monday.setDate(today.getDate() + daysUntilMonday)
-                              monday.setHours(9, 0, 0, 0)
-                              return toLocalISOString(monday)
-                            }
-                            
-                            const snoozeOptions = [
-                              { label: '1h', getDate: () => toLocalISOString(new Date(Date.now() + 60 * 60 * 1000)), title: 'Adiar 1 hora' },
-                              { label: '3h', getDate: () => toLocalISOString(new Date(Date.now() + 3 * 60 * 60 * 1000)), title: 'Adiar 3 horas' },
-                              { label: 'Amanhã', getDate: getTomorrow9am, title: 'Amanhã às 9h' },
-                              { label: 'Seg', getDate: getNextMonday9am, title: 'Segunda às 9h' },
-                            ]
-                            
-                            return snoozeOptions.map((option) => (
-                              <Button
-                                key={option.label}
-                                variant="ghost"
-                                size="sm"
-                                className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 h-7 text-xs"
-                                onClick={() => {
-                                  const newDate = option.getDate()
-                                  const updated = leads.map(l => 
-                                    l.id === lead.id ? { ...l, reminderDate: newDate } : l
-                                  )
-                                  setLeads(updated)
-                                  localStorage.setItem('whatszap-leads-v3', JSON.stringify(updated))
-                                  // Haptic feedback
-                                  if ('vibrate' in navigator) navigator.vibrate(10)
-                                }}
-                                title={option.title}
-                              >
-                                +{option.label}
-                              </Button>
-                            ))
-                          })()}
+                          {[
+                            { label: '1h', ms: 60 * 60 * 1000, title: 'Adiar 1 hora' },
+                            { label: '3h', ms: 3 * 60 * 60 * 1000, title: 'Adiar 3 horas' },
+                            { label: 'Amanhã', ms: 'tomorrow' as const, title: 'Amanhã às 9h' },
+                            { label: 'Seg', ms: 'monday' as const, title: 'Segunda às 9h' },
+                          ].map((option) => (
+                            <Button
+                              key={option.label}
+                              variant="ghost"
+                              size="sm"
+                              className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 h-7 text-xs active:scale-95 transition-transform"
+                              onClick={() => {
+                                let targetDate: Date
+                                if (option.ms === 'tomorrow') {
+                                  targetDate = new Date()
+                                  targetDate.setDate(targetDate.getDate() + 1)
+                                  targetDate.setHours(9, 0, 0, 0)
+                                } else if (option.ms === 'monday') {
+                                  const today = new Date()
+                                  const daysUntilMonday = (8 - today.getDay()) % 7 || 7
+                                  targetDate = new Date(today)
+                                  targetDate.setDate(today.getDate() + daysUntilMonday)
+                                  targetDate.setHours(9, 0, 0, 0)
+                                } else {
+                                  targetDate = new Date(Date.now() + option.ms)
+                                }
+                                
+                                // Format as local ISO string
+                                const year = targetDate.getFullYear()
+                                const month = String(targetDate.getMonth() + 1).padStart(2, '0')
+                                const day = String(targetDate.getDate()).padStart(2, '0')
+                                const hours = String(targetDate.getHours()).padStart(2, '0')
+                                const minutes = String(targetDate.getMinutes()).padStart(2, '0')
+                                const newDate = `${year}-${month}-${day}T${hours}:${minutes}`
+                                
+                                const updated = leads.map(l => 
+                                  l.id === lead.id ? { ...l, reminderDate: newDate } : l
+                                )
+                                setLeads(updated)
+                                localStorage.setItem('whatszap-leads-v3', JSON.stringify(updated))
+                                // Haptic feedback
+                                if ('vibrate' in navigator) navigator.vibrate(10)
+                              }}
+                              title={option.title}
+                            >
+                              +{option.label}
+                            </Button>
+                          ))}
                         </div>
                       )}
                       <Button 
