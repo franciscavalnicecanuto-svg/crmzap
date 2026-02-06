@@ -154,12 +154,23 @@ export default function RemindersPage() {
     })
   }, [filter, searchTerm, leads]) // Added leads dependency to catch markAsDone changes
 
+  // Bug fix #283: Also remove from notified reminders to allow re-scheduling
   const clearReminder = (leadId: string) => {
     const updated = leads.map(l => 
       l.id === leadId ? { ...l, reminderDate: undefined, reminderNote: undefined } : l
     )
     setLeads(updated)
     localStorage.setItem('whatszap-leads-v3', JSON.stringify(updated))
+    
+    // Bug fix #283: Remove from notified set so user can reschedule same lead
+    try {
+      const notifiedKey = 'whatszap-notified-reminders'
+      const notified = JSON.parse(localStorage.getItem(notifiedKey) || '[]')
+      const filtered = notified.filter((id: string) => id !== leadId)
+      localStorage.setItem(notifiedKey, JSON.stringify(filtered))
+    } catch (e) {
+      console.error('Failed to clear notified reminder:', e)
+    }
   }
 
   // Bug fix: markAsDone now records completion before clearing
@@ -226,6 +237,17 @@ export default function RemindersPage() {
     )
     setLeads(updated)
     localStorage.setItem('whatszap-leads-v3', JSON.stringify(updated))
+    
+    // Bug fix #283: Also clear notified reminders
+    try {
+      const notifiedKey = 'whatszap-notified-reminders'
+      const notified = JSON.parse(localStorage.getItem(notifiedKey) || '[]')
+      const overdueIds = new Set(overdueLeads.map(l => l.id))
+      const filtered = notified.filter((id: string) => !overdueIds.has(id))
+      localStorage.setItem(notifiedKey, JSON.stringify(filtered))
+    } catch (e) {
+      console.error('Failed to clear notified reminders:', e)
+    }
     
     // Haptic feedback
     if ('vibrate' in navigator) navigator.vibrate([10, 50, 10, 50, 10])
