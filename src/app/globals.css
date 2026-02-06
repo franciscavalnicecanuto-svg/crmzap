@@ -743,10 +743,35 @@ button:focus-visible,
   animation: urgent-pulse 2s ease-in-out infinite;
 }
 
-/* UX #207: Snooze button hover effect */
+/* UX #207: Enhanced snooze button hover effect */
+.snooze-btn {
+  transition: all 0.15s ease;
+  position: relative;
+}
+
 .snooze-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(251, 146, 60, 0.2);
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 4px 12px rgba(251, 146, 60, 0.3);
+  background-color: rgba(251, 146, 60, 0.1) !important;
+}
+
+.snooze-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* UX #352: Snooze button ripple effect */
+.snooze-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle, rgba(251, 146, 60, 0.3) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.snooze-btn:hover::after {
+  opacity: 1;
 }
 
 /* UX #210: Focus animation for textarea */

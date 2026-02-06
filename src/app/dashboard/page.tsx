@@ -1331,6 +1331,23 @@ function DashboardContent() {
           showToast(hasUrgent ? 'Urgente removido' : '🔥 Marcado como Urgente', hasUrgent ? 'info' : 'success')
           return
         }
+        // UX #350: 'c' to copy phone number quickly
+        if (e.key === 'c') {
+          e.preventDefault()
+          const phoneDigits = selectedLead.phone.replace(/\D/g, '')
+          navigator.clipboard.writeText(phoneDigits)
+          showToast(`📋 ${selectedLead.name.split(' ')[0]}: telefone copiado!`, 'success')
+          if ('vibrate' in navigator) navigator.vibrate([10, 30, 10])
+          return
+        }
+        // UX #351: 'w' to open WhatsApp Web directly
+        if (e.key === 'w') {
+          e.preventDefault()
+          const phoneDigits = selectedLead.phone.replace(/\D/g, '')
+          window.open(`https://wa.me/${phoneDigits}`, '_blank')
+          showToast(`📱 Abrindo WhatsApp...`, 'info')
+          return
+        }
         // 'Enter' to open chat on mobile
         if (e.key === 'Enter' && isMobile && !showChat) {
           e.preventDefault()
@@ -2247,32 +2264,70 @@ function DashboardContent() {
                                       }
                                       return null
                                     })()}
-                                    {/* UX #267: Cooling lead indicator */}
+                                    {/* UX #267: Cooling lead indicator with enhanced tooltip */}
                                     {isCooling && !hasUnread && (
-                                      <span 
-                                        className="text-[7px] px-1 py-0.5 bg-amber-400 text-amber-900 rounded-full font-medium flex items-center gap-0.5"
-                                        title="Sem contato há mais de 3 dias - considere fazer follow-up"
-                                      >
-                                        <Clock className="w-2 h-2" />
-                                        {!settings.compactView && '3d+'}
-                                      </span>
+                                      <div className="relative group/cooling">
+                                        <span 
+                                          className="text-[7px] px-1 py-0.5 bg-amber-400 text-amber-900 rounded-full font-medium flex items-center gap-0.5 cursor-help animate-pulse"
+                                        >
+                                          <Clock className="w-2 h-2" />
+                                          {!settings.compactView && '3d+'}
+                                        </span>
+                                        {/* Enhanced tooltip on hover */}
+                                        <div className="absolute bottom-full left-0 mb-1 hidden group-hover/cooling:block z-50 pointer-events-none">
+                                          <div className="bg-amber-50 border border-amber-300 rounded-lg p-2 shadow-lg min-w-[180px] text-[10px]">
+                                            <div className="font-semibold text-amber-800 mb-1 flex items-center gap-1">
+                                              ⚠️ Lead esfriando!
+                                            </div>
+                                            <p className="text-amber-700">
+                                              Sem contato há mais de 3 dias. Faça follow-up para não perder a venda!
+                                            </p>
+                                            <div className="mt-1.5 pt-1 border-t border-amber-200 text-[9px] text-amber-600">
+                                              💡 Dica: Pressione <kbd className="px-1 bg-amber-200 rounded">R</kbd> para criar lembrete
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
                                     )}
-                                    {/* UX #330: Days in status indicator - show for leads 5+ days in same status */}
+                                    {/* UX #330: Days in status indicator with enhanced tooltip - show for leads 5+ days in same status */}
                                     {!isCooling && !hasUnread && (() => {
                                       const days = getDaysInStatus(lead)
                                       if (!days || days < 5) return null
                                       const isStale = days >= 7
+                                      const isVeryStale = days >= 14
                                       return (
-                                        <span 
-                                          className={`text-[7px] px-1 py-0.5 rounded-full font-medium days-badge ${
-                                            isStale 
-                                              ? 'days-badge-danger text-red-600' 
-                                              : 'days-badge-warning text-amber-700'
-                                          }`}
-                                          title={`${days} dias neste status - considere atualizar ou fazer follow-up`}
-                                        >
-                                          {days}d
-                                        </span>
+                                        <div className="relative group/days">
+                                          <span 
+                                            className={`text-[7px] px-1 py-0.5 rounded-full font-medium days-badge cursor-help ${
+                                              isVeryStale
+                                                ? 'days-badge-danger text-red-700 animate-pulse'
+                                                : isStale 
+                                                  ? 'days-badge-danger text-red-600' 
+                                                  : 'days-badge-warning text-amber-700'
+                                            }`}
+                                          >
+                                            {days}d
+                                          </span>
+                                          {/* Enhanced tooltip on hover */}
+                                          <div className="absolute bottom-full left-0 mb-1 hidden group-hover/days:block z-50 pointer-events-none">
+                                            <div className={`border rounded-lg p-2 shadow-lg min-w-[160px] text-[10px] ${
+                                              isStale ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300'
+                                            }`}>
+                                              <div className={`font-semibold mb-1 flex items-center gap-1 ${
+                                                isStale ? 'text-red-800' : 'text-amber-800'
+                                              }`}>
+                                                {isVeryStale ? '🚨' : isStale ? '⚠️' : '⏰'} {days} dias neste status
+                                              </div>
+                                              <p className={isStale ? 'text-red-700' : 'text-amber-700'}>
+                                                {isVeryStale 
+                                                  ? 'Lead muito tempo parado! Atualize o status ou faça follow-up urgente.'
+                                                  : isStale
+                                                    ? 'Considere mover para outro status ou fazer follow-up.'
+                                                    : 'Lead aguardando há alguns dias.'}
+                                              </p>
+                                            </div>
+                                          </div>
+                                        </div>
                                       )
                                     })()}
                                     {/* UX #85: Enhanced reminder indicator with urgency levels */}

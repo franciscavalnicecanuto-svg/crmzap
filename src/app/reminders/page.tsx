@@ -603,20 +603,52 @@ export default function RemindersPage() {
         {/* Reminders List (active reminders) */}
         {filter !== 'completed' && filteredLeads.length === 0 ? (
           <div className="text-center py-16">
-            <Bell className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
+            <div className={`w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center ${
+              leadsWithReminders.length === 0 
+                ? 'bg-amber-100' 
+                : searchTerm 
+                  ? 'bg-blue-100' 
+                  : 'bg-gray-100'
+            }`}>
+              {searchTerm ? (
+                <Search className="w-8 h-8 text-blue-400" />
+              ) : (
+                <Bell className={`w-8 h-8 ${leadsWithReminders.length === 0 ? 'text-amber-400' : 'text-gray-400'}`} />
+              )}
+            </div>
             <h2 className="text-lg font-medium mb-1">
               {leadsWithReminders.length === 0 
                 ? 'Nenhum lembrete agendado' 
-                : 'Nenhum lembrete encontrado'}
+                : searchTerm 
+                  ? `Nenhum resultado para "${searchTerm}"`
+                  : filter === 'today' 
+                    ? 'Nenhum lembrete para hoje'
+                    : filter === 'overdue'
+                      ? '🎉 Nenhum lembrete atrasado!'
+                      : filter === 'upcoming'
+                        ? 'Nenhum lembrete futuro'
+                        : 'Nenhum lembrete encontrado'}
             </h2>
-            <p className="text-muted-foreground text-sm mb-4">
+            <p className="text-muted-foreground text-sm mb-4 max-w-xs mx-auto">
               {leadsWithReminders.length === 0 
-                ? 'Crie lembretes no dashboard para não esquecer de fazer follow-up'
-                : 'Tente ajustar os filtros ou a busca'}
+                ? 'Crie lembretes no dashboard para não esquecer de fazer follow-up com seus leads'
+                : searchTerm 
+                  ? 'Tente buscar por outro nome ou nota'
+                  : filter === 'overdue'
+                    ? 'Todos os seus lembretes estão em dia! Continue assim.'
+                    : 'Tente ajustar os filtros para ver outros lembretes'}
             </p>
-            <Link href="/dashboard">
-              <Button>Ir para o Dashboard</Button>
-            </Link>
+            <div className="flex gap-2 justify-center">
+              {(searchTerm || filter !== 'all') && (
+                <Button variant="outline" onClick={() => { setSearchTerm(''); setFilter('all') }}>
+                  <X className="w-3 h-3 mr-1" />
+                  Limpar filtros
+                </Button>
+              )}
+              <Link href="/dashboard">
+                <Button>Ir para o Dashboard</Button>
+              </Link>
+            </div>
           </div>
         ) : filter !== 'completed' && (
           <div className="space-y-3">
