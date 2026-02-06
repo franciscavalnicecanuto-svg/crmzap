@@ -2094,6 +2094,41 @@ function DashboardContent() {
                 </div>
               )}
               
+              {/* UX #600: Active filters indicator badge */}
+              {(() => {
+                const activeFilters = []
+                if (search.trim()) activeFilters.push('busca')
+                if (showUnreadOnly) activeFilters.push('não lidas')
+                if (tagFilter) activeFilters.push('tag')
+                if (dateFilter !== 'all') activeFilters.push('data')
+                if (statusFilter !== 'all') activeFilters.push('status')
+                
+                if (activeFilters.length === 0) return null
+                
+                return (
+                  <div className="flex items-center gap-1 px-2 py-0.5 bg-green-100 border border-green-300 rounded-full animate-in fade-in-0 duration-200">
+                    <Filter className="w-3 h-3 text-green-600" />
+                    <span className="text-[10px] font-medium text-green-700">
+                      {activeFilters.length} filtro{activeFilters.length > 1 ? 's' : ''} ativo{activeFilters.length > 1 ? 's' : ''}
+                    </span>
+                    <button
+                      onClick={() => {
+                        setSearch('')
+                        setShowUnreadOnly(false)
+                        setTagFilter(null)
+                        setDateFilter('all')
+                        setStatusFilter('all')
+                        showToast('Filtros limpos', 'info')
+                      }}
+                      className="ml-0.5 p-0.5 rounded-full hover:bg-green-200 transition"
+                      title="Limpar todos os filtros"
+                    >
+                      <X className="w-3 h-3 text-green-600" />
+                    </button>
+                  </div>
+                )
+              })()}
+              
               {/* Reports Button */}
               <Link href="/reports">
                 <Button 

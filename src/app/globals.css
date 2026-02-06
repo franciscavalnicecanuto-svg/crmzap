@@ -1572,3 +1572,152 @@ textarea:focus::placeholder {
 .keyboard-focused {
   animation: keyboard-nav-pulse 1.5s ease-in-out infinite;
 }
+
+/* UX #600: Active filters indicator */
+@keyframes filter-badge-appear {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.filter-badge-appear {
+  animation: filter-badge-appear 0.3s ease-out;
+}
+
+/* UX #601: Enhanced input shake for validation errors */
+@keyframes validation-shake {
+  0%, 100% { 
+    transform: translateX(0);
+    border-color: oklch(0.55 0.2 25);
+  }
+  10%, 30%, 50%, 70%, 90% { 
+    transform: translateX(-4px);
+    box-shadow: 0 0 0 3px oklch(0.55 0.2 25 / 0.2);
+  }
+  20%, 40%, 60%, 80% { 
+    transform: translateX(4px);
+  }
+}
+
+.validation-error-shake {
+  animation: validation-shake 0.5s ease-in-out;
+  border-color: oklch(0.55 0.2 25) !important;
+  background-color: oklch(0.55 0.2 25 / 0.05) !important;
+}
+
+/* UX #602: Enhanced quick reply press feedback */
+@keyframes quick-reply-select {
+  0% { 
+    transform: scale(1);
+    background-color: transparent;
+  }
+  50% { 
+    transform: scale(0.95);
+    background-color: oklch(0.55 0.18 145 / 0.3);
+  }
+  100% { 
+    transform: scale(1);
+    background-color: oklch(0.55 0.18 145 / 0.1);
+  }
+}
+
+.quick-reply-selected {
+  animation: quick-reply-select 0.2s ease-out;
+}
+
+/* UX #603: Better mobile scroll snap for kanban */
+@media (max-width: 768px) {
+  .kanban-container {
+    scroll-snap-type: x mandatory;
+    scroll-padding: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .kanban-column-snap {
+    scroll-snap-align: start;
+  }
+}
+
+/* UX #604: Improved attention indicator glow */
+@keyframes attention-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 15px 5px rgba(239, 68, 68, 0.2);
+  }
+}
+
+.attention-glow {
+  animation: attention-glow 2s ease-in-out infinite;
+}
+
+/* UX #605: Smooth counter animations */
+@keyframes counter-bump {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.counter-bump {
+  animation: counter-bump 0.2s ease-out;
+}
+
+/* UX #606: Better mobile touch targets */
+@media (hover: none) and (pointer: coarse) {
+  .touch-target-lg {
+    min-height: 48px;
+    min-width: 48px;
+  }
+  
+  .touch-feedback-subtle:active {
+    background-color: rgba(0, 0, 0, 0.05);
+    transform: scale(0.98);
+  }
+}
+
+/* UX #607: Improved skeleton pulse */
+@keyframes improved-skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.skeleton-improved {
+  animation: improved-skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* UX #608: Better focus states for inputs */
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px oklch(0.55 0.18 145 / 0.2);
+  border-color: oklch(0.55 0.18 145) !important;
+}
+
+/* UX #609: Smooth badge transitions */
+.badge-transition {
+  transition: all 0.2s ease-out;
+}
+
+.badge-transition:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}

@@ -634,6 +634,9 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
     }
   }
 
+  // UX #601: State for input shake animation on invalid message
+  const [inputShake, setInputShake] = useState(false)
+  
   const sendMessage = async () => {
     // Bug fix #15: Prevent double sends from rapid key presses
     if (!lead || !newMessage.trim() || isSendingRef.current) return
@@ -641,6 +644,10 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
     // Bug fix #292: Validate message content (not just whitespace/zero-width chars)
     const cleanedMessage = newMessage.trim().replace(/[\u200B-\u200D\uFEFF]/g, '')
     if (!cleanedMessage) {
+      // UX #601: Shake animation and haptic feedback on invalid message
+      setInputShake(true)
+      setTimeout(() => setInputShake(false), 500)
+      if ('vibrate' in navigator) navigator.vibrate([30, 50, 30])
       setSendError('Mensagem vazia ou contém apenas espaços')
       setTimeout(() => setSendError(null), 3000)
       return
@@ -1763,7 +1770,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
               onKeyDown={handleKeyDown}
               className={`w-full min-h-[40px] max-h-32 px-3 py-2.5 text-sm border rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all leading-5 ${
                 isSending ? 'bg-green-50/50 border-green-300' : ''
-              }`}
+              } ${inputShake ? 'validation-error-shake' : ''}`}
               disabled={isSending}
               rows={1}
               aria-label="Campo de mensagem. Enter para enviar, Shift+Enter para nova linha"
