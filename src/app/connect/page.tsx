@@ -24,6 +24,8 @@ export default function ConnectPage() {
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [countdown, setCountdown] = useState(60)
+  const [checkAttempts, setCheckAttempts] = useState(0) // UX #151: Track connection check attempts
+  const [isManualChecking, setIsManualChecking] = useState(false) // UX #151: Manual check loading state
 
   // Disconnect WhatsApp
   const disconnect = async () => {
@@ -53,6 +55,7 @@ export default function ConnectPage() {
       
       if (data.connected || data.state === 'open') {
         setState('connected')
+        setCheckAttempts(0) // Reset attempts on success
         return true
       }
       return false
@@ -61,6 +64,24 @@ export default function ConnectPage() {
       return false
     }
   }, [])
+  
+  // UX #151: Manual connection check with feedback
+  const manualCheckStatus = async () => {
+    setIsManualChecking(true)
+    setCheckAttempts(prev => prev + 1)
+    
+    // Haptic feedback
+    if ('vibrate' in navigator) navigator.vibrate(10)
+    
+    const isConnected = await checkStatus()
+    
+    if (!isConnected && checkAttempts >= 2) {
+      setError('Conexão não detectada. Certifique-se de escanear o QR Code no seu celular.')
+    }
+    
+    setIsManualChecking(false)
+    return isConnected
+  }
 
   // Generate QR Code
   const generateQRCode = useCallback(async () => {
@@ -293,15 +314,38 @@ export default function ConnectPage() {
                   </div>
                 </div>
 
-                {/* Refresh button */}
-                <Button 
-                  variant="outline" 
-                  className="w-full mt-6"
-                  onClick={generateQRCode}
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Gerar novo QR Code
-                </Button>
+                {/* UX #151: Manual check and refresh buttons */}
+                <div className="mt-6 grid grid-cols-2 gap-3">
+                  <Button 
+                    variant="default" 
+                    className="bg-green-500 hover:bg-green-600"
+                    onClick={manualCheckStatus}
+                    disabled={isManualChecking}
+                  >
+                    {isManualChecking ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Wifi className="w-4 h-4 mr-2" />
+                    )}
+                    {isManualChecking ? 'Verificando...' : 'Já escaneei'}
+                  </Button>
+                  <Button 
+                    variant="outline"
+                    onClick={generateQRCode}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Novo QR
+                  </Button>
+                </div>
+                
+                {/* UX #151: Attempt counter hint */}
+                {checkAttempts > 0 && (
+                  <p className="text-xs text-center text-muted-foreground mt-3 animate-in fade-in-0 duration-200">
+                    {checkAttempts === 1 && '🔍 Verificando conexão...'}
+                    {checkAttempts === 2 && '⏳ Aguarde o celular sincronizar...'}
+                    {checkAttempts >= 3 && '💡 Dica: Feche e abra o WhatsApp no celular'}
+                  </p>
+                )}
               </Card>
             )}
 

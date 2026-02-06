@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { ArrowLeft, Check, CreditCard, Loader2, Zap, Crown } from 'lucide-react'
+import { ArrowLeft, Check, CreditCard, Loader2, Zap, Crown, X, Mail, MessageCircle, Sparkles } from 'lucide-react'
 import { getUser } from '@/lib/supabase-client'
 import { SettingsNav } from '@/components/settings-nav'
 
@@ -23,6 +23,7 @@ interface Subscription {
 export default function SubscriptionPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false) // UX #150: Modal instead of alert
   const [subscription, setSubscription] = useState<Subscription>({
     plan: 'free',
     status: 'active',
@@ -60,9 +61,9 @@ export default function SubscriptionPage() {
     load()
   }, [router])
 
+  // UX #150: Modal instead of native alert()
   const upgradeToPro = () => {
-    // Would integrate with Stripe in production
-    alert('Integração com pagamento em breve! Por enquanto, entre em contato: suporte@whatszap.com.br')
+    setShowUpgradeModal(true)
   }
 
   if (isLoading) {
@@ -77,6 +78,60 @@ export default function SubscriptionPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* UX #150: Upgrade Modal - Beautiful custom modal instead of native alert */}
+      {showUpgradeModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in-0 duration-200"
+          onClick={() => setShowUpgradeModal(false)}
+        >
+          <div 
+            className="w-full max-w-md bg-background rounded-2xl shadow-2xl border animate-in zoom-in-95 slide-in-from-bottom-4 duration-300"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative p-6 text-center">
+              <button
+                onClick={() => setShowUpgradeModal(false)}
+                className="absolute top-4 right-4 p-1 rounded-full hover:bg-muted transition-colors"
+              >
+                <X className="w-5 h-5 text-muted-foreground" />
+              </button>
+              
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center shadow-lg shadow-green-500/25">
+                <Sparkles className="w-8 h-8 text-white" />
+              </div>
+              
+              <h3 className="text-xl font-bold mb-2">Integração em breve! 🚀</h3>
+              <p className="text-muted-foreground text-sm mb-6">
+                Estamos finalizando a integração de pagamentos. Por enquanto, você pode assinar entrando em contato conosco:
+              </p>
+              
+              <div className="space-y-3">
+                <a 
+                  href="https://wa.me/5585999999999?text=Olá!%20Quero%20assinar%20o%20plano%20Pro%20do%20CRMzap"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 w-full h-11 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors"
+                >
+                  <MessageCircle className="w-5 h-5" />
+                  Falar no WhatsApp
+                </a>
+                <a 
+                  href="mailto:suporte@whatszap.com.br?subject=Assinatura%20CRMzap%20Pro"
+                  className="flex items-center justify-center gap-2 w-full h-11 bg-muted hover:bg-muted/80 rounded-lg font-medium transition-colors"
+                >
+                  <Mail className="w-5 h-5" />
+                  Enviar Email
+                </a>
+              </div>
+              
+              <p className="text-xs text-muted-foreground mt-4">
+                suporte@whatszap.com.br
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="border-b">
         <div className="max-w-4xl mx-auto px-4 h-14 flex items-center gap-4">

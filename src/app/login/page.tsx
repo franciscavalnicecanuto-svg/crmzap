@@ -41,6 +41,38 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [socialLoading, setSocialLoading] = useState<AuthProvider | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null) // Bug #152: Email validation
+  const [passwordError, setPasswordError] = useState<string | null>(null) // Bug #152: Password validation
+  const [touched, setTouched] = useState({ email: false, password: false }) // Track touched fields
+  
+  // Bug #152: Email validation helper
+  const isValidEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return emailRegex.test(email)
+  }
+  
+  // Bug #152: Validate fields on blur
+  const validateEmail = () => {
+    setTouched(prev => ({ ...prev, email: true }))
+    if (!email) {
+      setEmailError('Email é obrigatório')
+    } else if (!isValidEmail(email)) {
+      setEmailError('Email inválido')
+    } else {
+      setEmailError(null)
+    }
+  }
+  
+  const validatePassword = () => {
+    setTouched(prev => ({ ...prev, password: true }))
+    if (!password) {
+      setPasswordError('Senha é obrigatória')
+    } else if (password.length < 6) {
+      setPasswordError('Senha deve ter pelo menos 6 caracteres')
+    } else {
+      setPasswordError(null)
+    }
+  }
 
   // Check if already logged in
   useEffect(() => {
@@ -66,18 +98,46 @@ export default function LoginPage() {
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Bug #152: Validate before submitting
+    validateEmail()
+    validatePassword()
+    
+    if (!isValidEmail(email)) {
+      setEmailError('Email inválido')
+      return
+    }
+    if (password.length < 6) {
+      setPasswordError('Senha deve ter pelo menos 6 caracteres')
+      return
+    }
+    
     setIsLoading(true)
     setError(null)
 
     const { data, error } = await signInWithEmail(email, password)
 
     if (error) {
-      setError(error.message)
+      // Bug #152: Better error messages in Portuguese
+      let errorMessage = error.message
+      if (error.message.includes('Invalid login credentials')) {
+        errorMessage = 'Email ou senha incorretos'
+      } else if (error.message.includes('Email not confirmed')) {
+        errorMessage = 'Confirme seu email antes de entrar'
+      } else if (error.message.includes('Too many requests')) {
+        errorMessage = 'Muitas tentativas. Aguarde um momento.'
+      }
+      setError(errorMessage)
       setIsLoading(false)
+      
+      // Haptic feedback on error
+      if ('vibrate' in navigator) navigator.vibrate([50, 30, 50])
       return
     }
 
     if (data?.session) {
+      // Haptic feedback on success
+      if ('vibrate' in navigator) navigator.vibrate([10, 50, 10])
       router.push('/dashboard')
     }
   }
@@ -127,17 +187,33 @@ export default function LoginPage() {
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${
+                  touched.email && emailError ? 'text-red-500' : 'text-muted-foreground'
+                }`} />
                 <Input
                   id="email"
                   type="email"
                   placeholder="seu@email.com"
-                  className="pl-9"
+                  className={`pl-9 transition-colors ${
+                    touched.email && emailError ? 'border-red-500 focus:ring-red-500' : ''
+                  }`}
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    if (touched.email) setEmailError(null) // Clear error on type
+                  }}
+                  onBlur={validateEmail}
                   required
+                  autoComplete="email"
+                  aria-invalid={touched.email && !!emailError}
+                  aria-describedby={emailError ? 'email-error' : undefined}
                 />
               </div>
+              {touched.email && emailError && (
+                <p id="email-error" className="text-xs text-red-500 animate-in fade-in-0 slide-in-from-top-1 duration-200">
+                  {emailError}
+                </p>
+              )}
             </div>
             
             <div className="space-y-2">
@@ -151,24 +227,41 @@ export default function LoginPage() {
                 </Link>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${
+                  touched.password && passwordError ? 'text-red-500' : 'text-muted-foreground'
+                }`} />
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
-                  className="pl-9 pr-9"
+                  className={`pl-9 pr-9 transition-colors ${
+                    touched.password && passwordError ? 'border-red-500 focus:ring-red-500' : ''
+                  }`}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    if (touched.password) setPasswordError(null) // Clear error on type
+                  }}
+                  onBlur={validatePassword}
                   required
+                  autoComplete="current-password"
+                  aria-invalid={touched.password && !!passwordError}
+                  aria-describedby={passwordError ? 'password-error' : undefined}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label={showPassword ? 'Esconder senha' : 'Mostrar senha'}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {touched.password && passwordError && (
+                <p id="password-error" className="text-xs text-red-500 animate-in fade-in-0 slide-in-from-top-1 duration-200">
+                  {passwordError}
+                </p>
+              )}
             </div>
 
             {error && (
