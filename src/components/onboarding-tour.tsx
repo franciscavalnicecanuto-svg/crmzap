@@ -74,6 +74,8 @@ const TOUR_STEPS: TourStep[] = [
   }
 ]
 
+// UX #158: Allow reopening tour via global event
+// Use: window.dispatchEvent(new Event('crmzap-open-tour'))
 export function OnboardingTour() {
   const [isOpen, setIsOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState(0)
@@ -81,13 +83,21 @@ export function OnboardingTour() {
   useEffect(() => {
     // Check if user already completed tour
     const completed = localStorage.getItem('crmzap-onboarding-completed')
-    if (completed) return
-
-    // Check if this is the dashboard page
-    if (window.location.pathname === '/dashboard') {
-      // Small delay to let the page render
-      setTimeout(() => setIsOpen(true), 1000)
+    if (!completed) {
+      // Check if this is the dashboard page
+      if (window.location.pathname === '/dashboard') {
+        // Small delay to let the page render
+        setTimeout(() => setIsOpen(true), 1000)
+      }
     }
+    
+    // UX #158: Listen for manual tour open event
+    const handleOpenTour = () => {
+      setCurrentStep(0)
+      setIsOpen(true)
+    }
+    window.addEventListener('crmzap-open-tour', handleOpenTour)
+    return () => window.removeEventListener('crmzap-open-tour', handleOpenTour)
   }, [])
 
   const handleNext = () => {

@@ -55,8 +55,9 @@ import {
   TrendingUp,
   Filter,
   AlertCircle,
-  Check
-  // Bug fix #38: Removed unused import 'Archive'
+  Check,
+  Keyboard,
+  HelpCircle
 } from 'lucide-react'
 import Link from 'next/link'
 import { getUser, getSession, signOut } from '@/lib/supabase-client'
@@ -1364,6 +1365,16 @@ function DashboardContent() {
                       Configurações
                     </DropdownMenuItem>
                   </Link>
+                  <DropdownMenuSeparator />
+                  {/* UX #158: Help options */}
+                  <DropdownMenuItem onClick={() => setShowKeyboardHelp(true)}>
+                    <Keyboard className="mr-2 h-4 w-4" />
+                    Atalhos de teclado
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => window.dispatchEvent(new Event('crmzap-open-tour'))}>
+                    <HelpCircle className="mr-2 h-4 w-4" />
+                    Ver tour novamente
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                     <LogOut className="mr-2 h-4 w-4" />
