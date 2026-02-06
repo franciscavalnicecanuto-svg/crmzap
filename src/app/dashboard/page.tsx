@@ -1229,6 +1229,20 @@ function DashboardContent() {
     .filter(l => l.reminderDate && new Date(l.reminderDate) <= new Date(Date.now() + 24 * 60 * 60 * 1000))
     .sort((a, b) => new Date(a.reminderDate!).getTime() - new Date(b.reminderDate!).getTime())
   
+  // UX #179: Get "cooling" leads - leads in 'novo' or 'em_contato' without activity for 3+ days
+  const coolingLeads = useMemo(() => {
+    const threeDaysAgo = Date.now() - 3 * 24 * 60 * 60 * 1000
+    return leads.filter(l => {
+      // Only check active statuses
+      if (!['novo', 'em_contato'].includes(l.status)) return false
+      // Already has a reminder set - user is aware
+      if (l.reminderDate) return false
+      // Check creation date (as proxy for last activity if we don't have lastMessageDate)
+      const createdAt = l.createdAt ? new Date(l.createdAt).getTime() : Date.now()
+      return createdAt < threeDaysAgo
+    }).slice(0, 5) // Show max 5
+  }, [leads])
+  
   // Add reminder to lead
   const addReminder = (leadId: string, date: string, note: string) => {
     // Bug fix #2: Validar data no passado e tempo mínimo de 5 minutos
@@ -1557,6 +1571,38 @@ function DashboardContent() {
                   </button>
                 ))}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* UX #179: Cooling Leads Alert - leads without contact for 3+ days */}
+        {coolingLeads.length > 0 && !pendingReminders.length && (
+          <div className="bg-blue-500/10 border-b border-blue-500/20 px-3 py-2 animate-in slide-in-from-top-1 duration-200">
+            <div className="flex items-center gap-2 text-xs">
+              <AlertCircle className="w-4 h-4 text-blue-400" />
+              <span className="text-blue-200 font-medium">
+                {coolingLeads.length} lead{coolingLeads.length > 1 ? 's' : ''} esfriando (sem contato há 3+ dias):
+              </span>
+              <div className="flex items-center gap-2 overflow-x-auto">
+                {coolingLeads.slice(0, 3).map(lead => (
+                  <button
+                    key={lead.id}
+                    onClick={() => {
+                      setSelectedLead(lead)
+                      setShowChat(true)
+                    }}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 transition whitespace-nowrap touch-manipulation"
+                  >
+                    {lead.name.split(' ')[0]}
+                  </button>
+                ))}
+                {coolingLeads.length > 3 && (
+                  <span className="text-blue-400 opacity-70">+{coolingLeads.length - 3}</span>
+                )}
+              </div>
+              <Link href="/reminders" className="ml-auto text-blue-300 hover:text-blue-200 underline underline-offset-2">
+                Ver todos →
+              </Link>
             </div>
           </div>
         )}
