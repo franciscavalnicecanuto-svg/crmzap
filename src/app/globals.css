@@ -1468,3 +1468,107 @@ textarea:focus::placeholder {
 .keyboard-nav-focused {
   animation: keyboard-nav-pulse 1.5s ease-in-out infinite;
 }
+
+/* UX #502: Quick reply button press animation */
+@keyframes quick-reply-press {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95); background-color: rgba(34, 197, 94, 0.2); }
+  100% { transform: scale(1); }
+}
+
+.quick-reply-pressed {
+  animation: quick-reply-press 0.15s ease-out;
+}
+
+/* UX #503: Copy success animation */
+@keyframes copy-success {
+  0% { transform: scale(1); }
+  25% { transform: scale(1.2); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.copy-success {
+  animation: copy-success 0.3s ease-out;
+}
+
+/* UX #504: Scroll button bounce on new messages */
+@keyframes scroll-button-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.3);
+  }
+  50% {
+    transform: scale(1.1);
+    box-shadow: 0 6px 20px rgba(34, 197, 94, 0.5);
+  }
+}
+
+.scroll-button-pulse {
+  animation: scroll-button-pulse 1s ease-in-out infinite;
+}
+
+/* UX #505: Reminder urgency pulse */
+@keyframes urgent-reminder-pulse {
+  0%, 100% {
+    border-color: rgba(249, 115, 22, 0.5);
+    box-shadow: 0 0 0 0 rgba(249, 115, 22, 0);
+  }
+  50% {
+    border-color: rgba(249, 115, 22, 0.8);
+    box-shadow: 0 0 12px 4px rgba(249, 115, 22, 0.2);
+  }
+}
+
+.urgent-reminder-pulse {
+  animation: urgent-reminder-pulse 1.5s ease-in-out infinite;
+}
+
+/* UX #506: Snooze button hover state */
+.snooze-btn {
+  transition: all 0.15s ease;
+}
+
+.snooze-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.snooze-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* UX #507: Reminder completing animation */
+@keyframes reminder-complete-slide {
+  0% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(100px) scale(0.9);
+  }
+}
+
+.reminder-completing {
+  animation: reminder-complete-slide 0.4s ease-out forwards;
+}
+
+/* UX #508: Empty state glow */
+@keyframes empty-state-glow {
+  0%, 100% {
+    box-shadow: 0 0 15px 5px rgba(34, 197, 94, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 25px 10px rgba(34, 197, 94, 0.2);
+  }
+}
+
+.empty-state-glow {
+  animation: empty-state-glow 3s ease-in-out infinite;
+}
+
+/* UX #509: Keyboard navigation focus */
+.keyboard-focused {
+  animation: keyboard-nav-pulse 1.5s ease-in-out infinite;
+}
