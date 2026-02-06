@@ -413,7 +413,7 @@ export default function LandingPage() {
                   Chat integrado direto no dashboard. Vê a conversa, responde, anota, tudo no mesmo lugar.
                 </p>
                 <ul className="space-y-3">
-                  {['Histórico completo de cada cliente', 'Notas e observações privadas', 'Um clique pra abrir no WhatsApp'].map((item, i) => (
+                  {['Histórico completo de cada cliente', 'Tags para organizar clientes', 'Um clique pra abrir no WhatsApp'].map((item, i) => (
                     <li key={i} className="flex items-center gap-3 text-sm text-white/70">
                       <CheckCircle2 className="w-4 h-4 text-violet-500" />
                       {item}

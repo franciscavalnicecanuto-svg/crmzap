@@ -12,7 +12,9 @@ import { useToast } from '@/components/ui/toast-notification'
 import { EmptyState } from '@/components/empty-state'
 import { DashboardSkeleton, LeadCardSkeleton } from '@/components/lead-card-skeleton'
 import { ConnectionStatus } from '@/components/connection-status'
-import { ReportsModal } from '@/components/reports-modal'
+import { OnboardingTour } from '@/components/onboarding-tour'
+import { logAction, ActionHistory } from '@/components/action-history'
+// ReportsModal moved to /reports page
 import { useSettings } from '@/components/theme-provider'
 import {
   DropdownMenu,
@@ -50,8 +52,8 @@ import {
   TrendingUp,
   Filter,
   AlertCircle,
-  Check,
-  Archive
+  Check
+  // Bug fix #38: Removed unused import 'Archive'
 } from 'lucide-react'
 import Link from 'next/link'
 import { getUser, getSession, signOut } from '@/lib/supabase-client'
@@ -300,13 +302,19 @@ function DashboardContent() {
   
   // Bug fix #1: Atualizar selectedLead quando leads muda
   // Bug fix #29: Only update if lead data actually changed (avoid infinite loops)
+  // Bug fix #36: Normalize array comparison (empty array vs undefined)
   useEffect(() => {
     if (selectedLead) {
       const updatedLead = leads.find(l => l.id === selectedLead.id)
       if (updatedLead) {
+        // Helper to normalize tags for comparison (undefined and [] are equivalent)
+        const normalizeTags = (tags: string[] | undefined) => (tags || []).sort().join(',')
+        
+        // Bug fix #37: Include name in comparison (Evolution API may update contact names)
         // Only update if any field actually changed
         const hasChanges = 
-          updatedLead.tags?.join(',') !== selectedLead.tags?.join(',') ||
+          updatedLead.name !== selectedLead.name ||
+          normalizeTags(updatedLead.tags) !== normalizeTags(selectedLead.tags) ||
           updatedLead.reminderDate !== selectedLead.reminderDate ||
           updatedLead.reminderNote !== selectedLead.reminderNote ||
           updatedLead.status !== selectedLead.status ||
@@ -329,28 +337,52 @@ function DashboardContent() {
   // New states for features
   const [dateFilter, setDateFilter] = useState<'all' | 'today' | '7days' | '30days'>('all')
   const [tagFilter, setTagFilter] = useState<string | null>(null)
+  const [showUnreadOnly, setShowUnreadOnly] = useState(false) // UX improvement #49: Filter unread messages
+  const searchInputRef = useRef<HTMLInputElement>(null) // UX improvement #50: Keyboard shortcut ref
   const [showReminderModal, setShowReminderModal] = useState(false)
   const [reminderLead, setReminderLead] = useState<Lead | null>(null)
   const [reminderDate, setReminderDate] = useState('')
   const [reminderNote, setReminderNote] = useState('')
   const [showTagModal, setShowTagModal] = useState(false)
   const [tagLead, setTagLead] = useState<Lead | null>(null)
-  const [showReportsModal, setShowReportsModal] = useState(false)
   const [kanbanColumns, setKanbanColumns] = useState<KanbanColumn[]>(defaultKanbanColumns)
 
-  // Bug fix #3: Fechar modais com ESC
+  // Bug fix #3: Fechar modais com ESC + UX #50: Ctrl+K para busca
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+K or Cmd+K to focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+        return
+      }
+      
+      // Escape to close modals or clear search
       if (e.key === 'Escape') {
         if (showDeleteConfirm) setShowDeleteConfirm(null)
         else if (showTagModal) setShowTagModal(false)
         else if (showReminderModal) setShowReminderModal(false)
-        else if (showReportsModal) setShowReportsModal(false)
+        else if (search) setSearch('')
+        else if (showChat && isMobile) {
+          setSelectedLead(null)
+          setShowChat(false)
+        }
       }
     }
-    window.addEventListener('keydown', handleEsc)
-    return () => window.removeEventListener('keydown', handleEsc)
-  }, [showTagModal, showReminderModal, showReportsModal, showDeleteConfirm])
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [showTagModal, showReminderModal, showDeleteConfirm, search, showChat, isMobile])
+
+  // Bug fix #33: Sync tagLead with leads when tags are updated externally (e.g., AI analysis)
+  useEffect(() => {
+    if (tagLead && showTagModal) {
+      const updatedLead = leads.find(l => l.id === tagLead.id)
+      if (updatedLead && updatedLead.tags?.join(',') !== tagLead.tags?.join(',')) {
+        setTagLead(updatedLead)
+      }
+    }
+  }, [leads, tagLead?.id, showTagModal])
 
   // Fetch user on mount
   useEffect(() => {
@@ -520,8 +552,9 @@ function DashboardContent() {
   }, [leads, mounted, showToast])
 
   // Save leads to localStorage when they change
+  // Bug fix #46: Also save when leads array becomes empty (user deleted all leads)
   useEffect(() => {
-    if (mounted && leads.length > 0) {
+    if (mounted) {
       localStorage.setItem('whatszap-leads-v3', JSON.stringify(leads))
     }
   }, [leads, mounted])
@@ -760,18 +793,28 @@ function DashboardContent() {
   }
 
   const moveLead = (id: string, newStatus: LeadStatus) => {
+    const lead = leads.find(l => l.id === id)
+    const oldStatus = lead?.status
+    
     setLeads(prev => prev.map(lead => 
       lead.id === id ? { ...lead, status: newStatus } : lead
     ))
     
     // BUG #8 FIX: Persistir status no Supabase
-    const lead = leads.find(l => l.id === id)
     if (lead) {
       fetch('/api/leads/status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone: lead.phone, status: newStatus }),
       }).catch(err => console.error('Failed to persist status:', err))
+      
+      // Log action
+      logAction({
+        type: 'status_change',
+        leadId: lead.id,
+        leadName: lead.name,
+        details: { from: oldStatus, to: newStatus }
+      })
     }
   }
 
@@ -858,6 +901,20 @@ function DashboardContent() {
   const hasUnreadMessages = (lead: Lead) => {
     return (lead.unreadCount || 0) > 0 && !readLeads.has(lead.id)
   }
+  
+  // UX #53: Mark all as read
+  const markAllAsRead = () => {
+    const unreadLeadIds = leads.filter(l => hasUnreadMessages(l)).map(l => l.id)
+    if (unreadLeadIds.length === 0) return
+    
+    setReadLeads(prev => new Set([...prev, ...unreadLeadIds]))
+    showToast(`${unreadLeadIds.length} conversa${unreadLeadIds.length > 1 ? 's' : ''} marcada${unreadLeadIds.length > 1 ? 's' : ''} como lida${unreadLeadIds.length > 1 ? 's' : ''}`, 'success')
+    
+    // Haptic feedback
+    if ('vibrate' in navigator) {
+      navigator.vibrate(10)
+    }
+  }
 
   // Pull to refresh handlers
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -904,13 +961,37 @@ function DashboardContent() {
   const normalizeText = (text: string) => 
     text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
   
+  // UX #52: Format phone number for display (Brazilian format)
+  const formatPhone = (phone: string) => {
+    const digits = phone.replace(/\D/g, '')
+    if (digits.length === 13 && digits.startsWith('55')) {
+      // Brazilian format: +55 (XX) 9XXXX-XXXX
+      return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4, 5)}${digits.slice(5, 9)}-${digits.slice(9)}`
+    } else if (digits.length === 12 && digits.startsWith('55')) {
+      // Brazilian format: +55 (XX) XXXX-XXXX
+      return `+${digits.slice(0, 2)} (${digits.slice(2, 4)}) ${digits.slice(4, 8)}-${digits.slice(8)}`
+    } else if (digits.length >= 10) {
+      // Generic format: last 4 digits separated
+      return digits.slice(0, -4) + '-' + digits.slice(-4)
+    }
+    return phone // Return as-is if can't format
+  }
+  
   // Date filter helper
+  // Bug fix #41: Use calendar day comparison for "today" instead of time-based diff
+  // (A lead created at 11:30 PM yesterday should NOT appear as "today" at 12:30 AM)
   const isInDateRange = (lead: Lead) => {
     if (dateFilter === 'all') return true
     const createdAt = lead.createdAt ? new Date(lead.createdAt) : new Date()
     const now = new Date()
+    
+    if (dateFilter === 'today') {
+      // Use toDateString() for accurate calendar day comparison
+      return createdAt.toDateString() === now.toDateString()
+    }
+    
+    // For 7days and 30days, time-based diff is acceptable
     const diffDays = Math.floor((now.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24))
-    if (dateFilter === 'today') return diffDays === 0
     if (dateFilter === '7days') return diffDays <= 7
     if (dateFilter === '30days') return diffDays <= 30
     return true
@@ -926,7 +1007,9 @@ function DashboardContent() {
       (searchDigits.length > 0 ? lead.phone.replace(/\D/g, '').includes(searchDigits) : lead.phone.includes(searchTrimmed))
     const matchesDate = isInDateRange(lead)
     const matchesTag = !tagFilter || lead.tags?.includes(tagFilter)
-    return matchesSearch && matchesDate && matchesTag
+    // UX #49: Filter by unread status
+    const matchesUnread = !showUnreadOnly || hasUnreadMessages(lead)
+    return matchesSearch && matchesDate && matchesTag && matchesUnread
   })
 
   const getLeadsByStatus = (status: LeadStatus) => 
@@ -952,12 +1035,19 @@ function DashboardContent() {
   // Add reminder to lead
   const addReminder = (leadId: string, date: string, note: string) => {
     // Bug fix #2: Validar data no passado e tempo mínimo de 5 minutos
+    // Bug fix #48: Mensagem de erro mais clara distinguindo "data passada" de "horário passou hoje"
     const reminderDateTime = new Date(date)
     const now = new Date()
     const minTime = new Date(now.getTime() + 5 * 60 * 1000) // 5 minutes from now
     
     if (reminderDateTime < now) {
-      showToast('Data não pode ser no passado', 'error')
+      // Check if it's today but time already passed vs a past date
+      const isToday = reminderDateTime.toDateString() === now.toDateString()
+      if (isToday) {
+        showToast('Esse horário já passou. Escolha um horário futuro.', 'error')
+      } else {
+        showToast('Data não pode ser no passado', 'error')
+      }
       return
     }
     
@@ -966,6 +1056,7 @@ function DashboardContent() {
       return
     }
     
+    const lead = leads.find(l => l.id === leadId)
     setLeads(prev => prev.map(l => 
       l.id === leadId ? { ...l, reminderDate: date, reminderNote: note } : l
     ))
@@ -974,6 +1065,16 @@ function DashboardContent() {
     setReminderDate('')
     setReminderNote('')
     showToast('Lembrete criado ✓', 'success')
+    
+    // Log action
+    if (lead) {
+      logAction({
+        type: 'reminder_set',
+        leadId: lead.id,
+        leadName: lead.name,
+        details: { date, note }
+      })
+    }
   }
   
   // Clear reminder
@@ -1057,13 +1158,21 @@ function DashboardContent() {
               <Link href="/" className="flex items-center gap-1.5 hover:opacity-80 transition">
                 <div className="relative">
                   <img src="/logo.png" alt="CRMzap" className="w-6 h-6 rounded-md" />
-                  {/* Unread counter badge */}
+                  {/* UX #53: Unread counter badge with mark all as read on click */}
                   {(() => {
                     const unreadCount = leads.filter(l => (l.unreadCount || 0) > 0 && !readLeads.has(l.id)).length
                     return unreadCount > 0 ? (
-                      <span className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          markAllAsRead()
+                        }}
+                        className="absolute -top-1 -right-1 min-w-[14px] h-[14px] bg-red-500 hover:bg-red-600 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 cursor-pointer transition-colors"
+                        title="Clique para marcar todas como lidas"
+                      >
                         {unreadCount > 99 ? '99+' : unreadCount}
-                      </span>
+                      </button>
                     ) : null
                   })()}
                 </div>
@@ -1071,16 +1180,17 @@ function DashboardContent() {
               </Link>
             </div>
             
-            {/* Bug fix #12: Campo de busca melhorado com botão de limpar */}
+            {/* Bug fix #12: Campo de busca melhorado com botão de limpar + UX #50: Keyboard shortcut */}
             <div className="flex-1 max-w-xs">
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
                 <Input 
-                  placeholder="Buscar leads..." 
+                  ref={searchInputRef}
+                  placeholder="Buscar... (Ctrl+K)" 
                   className="pl-7 pr-7 h-7 text-xs"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  aria-label="Buscar leads"
+                  aria-label="Buscar leads (Ctrl+K)"
                 />
                 {search && (
                   <button
@@ -1247,7 +1357,27 @@ function DashboardContent() {
             
             {/* Bug fix #6: Filters com contadores */}
             <div className="flex items-center gap-2 flex-shrink-0">
+              {/* UX #49: Unread Filter - Quick toggle for unread messages */}
+              {(() => {
+                const unreadCount = leads.filter(l => hasUnreadMessages(l)).length
+                return unreadCount > 0 ? (
+                  <Button 
+                    variant={showUnreadOnly ? 'default' : 'outline'}
+                    size="sm" 
+                    className={`h-6 text-xs px-2 gap-1 ${showUnreadOnly ? 'bg-green-500 hover:bg-green-600 text-white' : 'border-green-300 text-green-600 hover:bg-green-50'}`}
+                    onClick={() => setShowUnreadOnly(!showUnreadOnly)}
+                  >
+                    <MessageCircle className="w-3 h-3" />
+                    <span className="hidden sm:inline">Não lidas</span>
+                    <Badge variant={showUnreadOnly ? 'outline' : 'secondary'} className={`ml-1 h-4 px-1 text-[10px] ${showUnreadOnly ? 'border-white/50 text-white' : ''}`}>
+                      {unreadCount}
+                    </Badge>
+                  </Button>
+                ) : null
+              })()}
+              
               {/* Date Filter */}
+              {/* Bug fix #42 & #43: Use consistent date filtering logic (calendar day for 'today') */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-6 text-xs px-2 gap-1">
@@ -1258,8 +1388,9 @@ function DashboardContent() {
                         {leads.filter(l => {
                           const created = l.createdAt ? new Date(l.createdAt) : new Date()
                           const now = new Date()
+                          // Bug fix #42: Use toDateString for 'today' to match isInDateRange logic
+                          if (dateFilter === 'today') return created.toDateString() === now.toDateString()
                           const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
-                          if (dateFilter === 'today') return diffDays === 0
                           if (dateFilter === '7days') return diffDays <= 7
                           if (dateFilter === '30days') return diffDays <= 30
                           return true
@@ -1281,15 +1412,16 @@ function DashboardContent() {
                   <DropdownMenuItem onClick={() => setDateFilter('7days')}>
                     Últimos 7 dias <span className="ml-auto text-muted-foreground">{leads.filter(l => {
                       const created = l.createdAt ? new Date(l.createdAt) : new Date()
+                      // Bug fix #43: Include today in 7 days count (0 <= diffDays <= 7)
                       const diffDays = Math.floor((new Date().getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
-                      return diffDays <= 7
+                      return diffDays >= 0 && diffDays <= 7
                     }).length}</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setDateFilter('30days')}>
                     Últimos 30 dias <span className="ml-auto text-muted-foreground">{leads.filter(l => {
                       const created = l.createdAt ? new Date(l.createdAt) : new Date()
                       const diffDays = Math.floor((new Date().getTime() - created.getTime()) / (1000 * 60 * 60 * 24))
-                      return diffDays <= 30
+                      return diffDays >= 0 && diffDays <= 30
                     }).length}</span>
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -1325,15 +1457,21 @@ function DashboardContent() {
               </DropdownMenu>
               
               {/* Reports Button */}
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-6 text-xs px-2 gap-1 border-blue-300 text-blue-600 hover:bg-blue-50"
-                onClick={() => setShowReportsModal(true)}
-              >
-                <BarChart3 className="w-3 h-3" />
-                Relatórios
-              </Button>
+              <Link href="/reports">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="h-6 text-xs px-2 gap-1 border-blue-300 text-blue-600 hover:bg-blue-50"
+                >
+                  <BarChart3 className="w-3 h-3" />
+                  Relatórios
+                </Button>
+              </Link>
+              
+              {/* History - Compact */}
+              <div className="hidden md:block">
+                <ActionHistory compact limit={5} />
+              </div>
             </div>
           </div>
         </div>
@@ -1345,7 +1483,7 @@ function DashboardContent() {
           </div>
         )}
 
-        {/* Empty State */}
+        {/* Empty State - No leads at all */}
         {!isLoadingLeads && leads.length === 0 && (
           <div className="flex-1 flex items-center justify-center">
             <EmptyState 
@@ -1355,9 +1493,48 @@ function DashboardContent() {
             />
           </div>
         )}
+        
+        {/* UX #51: Empty state for filtered/searched results */}
+        {!isLoadingLeads && leads.length > 0 && filteredLeads.length === 0 && (
+          <div className="flex-1 flex items-center justify-center p-8">
+            <div className="text-center max-w-sm">
+              <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                <Search className="w-8 h-8 text-muted-foreground/50" />
+              </div>
+              <h3 className="font-medium text-lg mb-2">Nenhum lead encontrado</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                {search ? `Não encontramos resultados para "${search.trim()}"` : 
+                 showUnreadOnly ? 'Não há mensagens não lidas no momento' :
+                 tagFilter ? `Nenhum lead com a tag "${tagFilter}"` :
+                 dateFilter !== 'all' ? `Nenhum lead criado neste período` :
+                 'Tente ajustar seus filtros'}
+              </p>
+              <div className="flex gap-2 justify-center flex-wrap">
+                {search && (
+                  <Button variant="outline" size="sm" onClick={() => setSearch('')}>
+                    <X className="w-3 h-3 mr-1" />
+                    Limpar busca
+                  </Button>
+                )}
+                {showUnreadOnly && (
+                  <Button variant="outline" size="sm" onClick={() => setShowUnreadOnly(false)}>
+                    <MessageCircle className="w-3 h-3 mr-1" />
+                    Ver todas
+                  </Button>
+                )}
+                {(tagFilter || dateFilter !== 'all') && (
+                  <Button variant="outline" size="sm" onClick={() => { setTagFilter(null); setDateFilter('all') }}>
+                    <Filter className="w-3 h-3 mr-1" />
+                    Limpar filtros
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
-        {/* Kanban Board */}
-        {!isLoadingLeads && leads.length > 0 && (
+        {/* Kanban Board - Only show when we have filtered results */}
+        {!isLoadingLeads && leads.length > 0 && filteredLeads.length > 0 && (
           <div className="flex-1 overflow-x-auto overflow-y-hidden p-2 pb-4">
             <div className="flex gap-2 h-full" style={{ minWidth: 'max-content', paddingRight: '8px' }}>
               {kanbanColumns.filter(col => col.visible).map((column) => {
@@ -1491,9 +1668,9 @@ function DashboardContent() {
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       setReminderLead(lead)
-                                      // Bug fix #4: Pre-populate with existing reminder data
-                                      setReminderDate(lead.reminderDate || '')
-                                      setReminderNote(lead.reminderNote || '')
+                                      // Bug fix #34: Clear date for new reminders (no pre-populate needed here)
+                                      setReminderDate('')
+                                      setReminderNote('')
                                       setShowReminderModal(true)
                                     }}
                                     className="p-1 rounded bg-background/80 hover:bg-muted transition"
@@ -1580,10 +1757,23 @@ function DashboardContent() {
                             </Card>
                           ))}
                           
-                          {/* Passed reminders with visual distinction */}
+                          {/* Passed reminders with visual distinction + UX #54: Clear all overdue */}
                           {passedReminders.length > 0 && (
                             <div className="pt-1 mt-1 border-t border-amber-200/50">
-                              <p className="text-[8px] text-muted-foreground mb-1 px-1">Passados</p>
+                              <div className="flex items-center justify-between px-1 mb-1">
+                                <p className="text-[8px] text-muted-foreground">Passados</p>
+                                {passedReminders.length > 1 && (
+                                  <button 
+                                    onClick={() => {
+                                      passedReminders.forEach(l => clearReminder(l.id))
+                                      showToast(`${passedReminders.length} lembretes removidos`, 'info')
+                                    }}
+                                    className="text-[8px] text-red-500 hover:text-red-700 transition"
+                                  >
+                                    Limpar todos
+                                  </button>
+                                )}
+                              </div>
                               {passedReminders.map(lead => (
                                 <Card 
                                   key={`reminder-passed-${lead.id}`}
@@ -1664,8 +1854,26 @@ function DashboardContent() {
           onOpenReminder={() => {
             if (selectedLead) {
               setReminderLead(selectedLead)
-              // Bug fix #4: Pre-populate with existing reminder data
-              setReminderDate(selectedLead.reminderDate || '')
+              // Bug fix #34: Format ISO date to datetime-local format (YYYY-MM-DDTHH:MM)
+              // Bug fix #39: Use local time, not UTC (toISOString converts to UTC which is wrong)
+              const existingDate = selectedLead.reminderDate
+              if (existingDate) {
+                try {
+                  const date = new Date(existingDate)
+                  // Format as YYYY-MM-DDTHH:MM in LOCAL timezone for datetime-local input
+                  const year = date.getFullYear()
+                  const month = String(date.getMonth() + 1).padStart(2, '0')
+                  const day = String(date.getDate()).padStart(2, '0')
+                  const hours = String(date.getHours()).padStart(2, '0')
+                  const minutes = String(date.getMinutes()).padStart(2, '0')
+                  const formatted = `${year}-${month}-${day}T${hours}:${minutes}`
+                  setReminderDate(formatted)
+                } catch {
+                  setReminderDate('')
+                }
+              } else {
+                setReminderDate('')
+              }
               setReminderNote(selectedLead.reminderNote || '')
               setShowReminderModal(true)
             }
@@ -1820,7 +2028,16 @@ function DashboardContent() {
                   type="datetime-local"
                   value={reminderDate}
                   onChange={e => setReminderDate(e.target.value)}
-                  min={new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16)}
+                  min={(() => {
+                    // Bug fix #40: Use local time for min (not UTC like toISOString does)
+                    const minDate = new Date(Date.now() + 5 * 60 * 1000)
+                    const year = minDate.getFullYear()
+                    const month = String(minDate.getMonth() + 1).padStart(2, '0')
+                    const day = String(minDate.getDate()).padStart(2, '0')
+                    const hours = String(minDate.getHours()).padStart(2, '0')
+                    const minutes = String(minDate.getMinutes()).padStart(2, '0')
+                    return `${year}-${month}-${day}T${hours}:${minutes}`
+                  })()}
                   className="text-sm"
                 />
               </div>
@@ -1860,14 +2077,6 @@ function DashboardContent() {
         </div>
       )}
 
-      {/* Reports Modal */}
-      {showReportsModal && (
-        <ReportsModal 
-          leads={leads}
-          onClose={() => setShowReportsModal(false)}
-        />
-      )}
-
       {/* Bug fix #4: Modal de confirmação de delete */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 animate-in fade-in-0 duration-150" onClick={() => setShowDeleteConfirm(null)}>
@@ -1904,6 +2113,9 @@ function DashboardContent() {
           </div>
         </div>
       )}
+
+      {/* Onboarding Tour */}
+      <OnboardingTour />
     </div>
   )
 }

@@ -13,6 +13,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
+import { TemplateButton } from '@/components/message-templates'
+import { AISuggestions } from '@/components/ai-suggestions'
+import { logAction } from '@/components/action-history'
 
 // Message skeleton for loading state
 const MessageSkeleton = ({ fromMe = false }: { fromMe?: boolean }) => (
@@ -50,13 +53,19 @@ interface ChatPanelProps {
 }
 
 // Helper to render media messages with icons
+// Bug fix #32: Only treat known media markers as media (not arbitrary text starting with [)
+// Bug fix #45: Added English variants (location, image, document, etc.) for Evolution API compatibility
+// Bug fix #47: Added viewOnce variants for disappearing media messages
 const renderMessageContent = (text: string, fromMe: boolean) => {
-  const isMedia = text === '[mídia]' || text.startsWith('[')
+  const mediaPatterns = /^\[(mídia|media|imagem|image|foto|photo|vídeo|video|áudio|audio|ptt|voice|documento|document|arquivo|file|sticker|figurinha|gif|localização|location|contato|contact|viewonce|view once|visualização única)\]$/i
+  const isMedia = mediaPatterns.test(text)
   
   if (isMedia) {
     const iconClass = `h-4 w-4 inline mr-1 ${fromMe ? 'text-green-100' : 'text-muted-foreground'}`
+    const lowerText = text.toLowerCase()
     
-    if (text.includes('imagem') || text.includes('foto') || text === '[mídia]') {
+    // Bug fix #45: Include English variants for Evolution API compatibility
+    if (lowerText.includes('imagem') || lowerText.includes('image') || lowerText.includes('foto') || lowerText.includes('photo') || text === '[mídia]' || text === '[media]') {
       return (
         <span className="flex items-center gap-1 italic opacity-80">
           <Image className={iconClass} />
@@ -64,7 +73,7 @@ const renderMessageContent = (text: string, fromMe: boolean) => {
         </span>
       )
     }
-    if (text.includes('vídeo') || text.includes('video')) {
+    if (lowerText.includes('vídeo') || lowerText.includes('video')) {
       return (
         <span className="flex items-center gap-1 italic opacity-80">
           <Video className={iconClass} />
@@ -72,7 +81,7 @@ const renderMessageContent = (text: string, fromMe: boolean) => {
         </span>
       )
     }
-    if (text.includes('áudio') || text.includes('audio') || text.includes('ptt')) {
+    if (lowerText.includes('áudio') || lowerText.includes('audio') || lowerText.includes('ptt') || lowerText.includes('voice')) {
       return (
         <span className="flex items-center gap-1 italic opacity-80">
           <Mic className={iconClass} />
@@ -80,11 +89,27 @@ const renderMessageContent = (text: string, fromMe: boolean) => {
         </span>
       )
     }
-    if (text.includes('documento') || text.includes('arquivo')) {
+    if (lowerText.includes('documento') || lowerText.includes('document') || lowerText.includes('arquivo') || lowerText.includes('file')) {
       return (
         <span className="flex items-center gap-1 italic opacity-80">
           <FileText className={iconClass} />
           <span>Documento</span>
+        </span>
+      )
+    }
+    if (lowerText.includes('localização') || lowerText.includes('location')) {
+      return (
+        <span className="flex items-center gap-1 italic opacity-80">
+          <Image className={iconClass} />
+          <span>Localização</span>
+        </span>
+      )
+    }
+    if (lowerText.includes('contato') || lowerText.includes('contact')) {
+      return (
+        <span className="flex items-center gap-1 italic opacity-80">
+          <FileText className={iconClass} />
+          <span>Contato</span>
         </span>
       )
     }
@@ -353,6 +378,9 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
                 setAnalysis(fullContent)
                 setAnalysisProgress(data.percent)
               } else if (data.type === 'complete') {
+                // Bug fix #31: Don't update if lead changed during analysis
+                if (currentLeadId !== analysisLeadIdRef.current) return
+                
                 setAnalysisProgress(100)
                 setAnalysisStatus('Concluído!')
                 setAnalysis(data.analysis)
@@ -397,7 +425,11 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
       }
     } catch (err: any) {
       // Bug fix #26: Ignore abort errors
-      if (err?.name === 'AbortError') return
+      // Bug fix #44: Must still reset isAnalyzing on abort, otherwise button stays disabled
+      if (err?.name === 'AbortError') {
+        setIsAnalyzing(false)
+        return
+      }
       console.error('Analysis error:', err)
       setAnalysisError(err.message || 'Erro ao gerar análise')
     } finally {
@@ -451,6 +483,16 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
           timestamp: new Date().toISOString(),
         }])
         setNewMessage('')
+        
+        // Log action
+        if (lead) {
+          logAction({
+            type: 'message_sent',
+            leadId: lead.id,
+            leadName: lead.name,
+            details: { messagePreview: newMessage.trim().slice(0, 50) }
+          })
+        }
       } else {
         setSendError(data.error || 'Falha ao enviar mensagem')
         // Clear error after 5 seconds
@@ -819,6 +861,15 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
         </div>
       )}
 
+      {/* AI Suggestions */}
+      {messages.length > 0 && (
+        <AISuggestions
+          messages={messages.map(m => ({ role: m.fromMe ? 'assistant' : 'user', content: m.text }))}
+          leadName={lead?.name}
+          onSelectSuggestion={(text) => setNewMessage(text)}
+        />
+      )}
+
       {/* Input */}
       <div className="p-3 border-t">
         {sendError && (
@@ -827,6 +878,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
           </div>
         )}
         <div className="flex gap-2">
+          <TemplateButton onSelect={(content) => setNewMessage(content)} />
           <Input
             placeholder="Digite uma mensagem..."
             value={newMessage}

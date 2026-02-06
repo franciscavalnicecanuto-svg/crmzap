@@ -2,9 +2,10 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { User, CreditCard, Bell, Settings } from 'lucide-react'
+import { User, CreditCard, Bell, Settings, BarChart3 } from 'lucide-react'
 
 const navItems = [
+  { href: '/reports', label: 'Relatórios', icon: BarChart3 },
   { href: '/profile', label: 'Perfil', icon: User },
   { href: '/subscription', label: 'Assinatura', icon: CreditCard },
   { href: '/reminders', label: 'Lembretes', icon: Bell },

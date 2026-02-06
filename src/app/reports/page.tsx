@@ -1,9 +1,12 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useEffect, useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
 import { 
-  X, 
+  ArrowLeft, 
   BarChart3, 
   Clock, 
   TrendingUp, 
@@ -17,9 +20,11 @@ import {
   ArrowDown,
   Minus,
   Download,
-  Loader2
+  Loader2,
+  FileText
 } from 'lucide-react'
-import jsPDF from 'jspdf'
+import { getUser } from '@/lib/supabase-client'
+import { SettingsNav } from '@/components/settings-nav'
 
 type LeadStatus = 'novo' | 'em_contato' | 'negociando' | 'fechado' | 'perdido'
 type LeadSource = 'whatsapp' | 'telegram' | 'instagram' | 'facebook' | 'unknown'
@@ -37,11 +42,6 @@ interface Lead {
   lastMessage?: string
 }
 
-interface ReportsModalProps {
-  leads: Lead[]
-  onClose: () => void
-}
-
 // Heat map component for best times
 function HeatMap({ data }: { data: number[][] }) {
   const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
@@ -52,7 +52,7 @@ function HeatMap({ data }: { data: number[][] }) {
     <div className="overflow-x-auto">
       <div className="inline-block min-w-full">
         <div className="flex gap-1">
-          <div className="w-8" /> {/* Spacer for hours column */}
+          <div className="w-8" />
           {days.map(day => (
             <div key={day} className="w-10 text-center text-[10px] text-muted-foreground font-medium">
               {day}
@@ -148,7 +148,6 @@ function StatCard({
   )
 }
 
-// Timing data from API
 interface TimingData {
   avgResponseTimeMinutes: number | null
   avgCycleDays: number | null
@@ -158,11 +157,14 @@ interface TimingData {
   bestTime: { day: string; hour: string; count: number } | null
 }
 
-export function ReportsModal({ leads, onClose }: ReportsModalProps) {
+export default function ReportsPage() {
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
+  const [leads, setLeads] = useState<Lead[]>([])
   const [activeTab, setActiveTab] = useState<'overview' | 'funnel' | 'timing' | 'forecast'>('overview')
   const [timingData, setTimingData] = useState<TimingData | null>(null)
   const [timingLoading, setTimingLoading] = useState(false)
-  const [exporting, setExporting] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
   const [monthlyGoal, setMonthlyGoal] = useState(10000)
 
   // Load monthly goal from localStorage
@@ -171,12 +173,47 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
     if (saved) setMonthlyGoal(parseInt(saved) || 10000)
   }, [])
 
-  // Export to PDF - programmatic generation
-  const handleExportPDF = async () => {
-    if (exporting) return
-    
-    setExporting(true)
-    
+  useEffect(() => {
+    async function load() {
+      try {
+        const { user, error } = await getUser()
+        if (error || !user) {
+          router.push('/login')
+          return
+        }
+        // Load leads from localStorage
+        const savedLeads = localStorage.getItem('whatszap-leads-v3')
+        if (savedLeads) {
+          setLeads(JSON.parse(savedLeads))
+        }
+      } catch (e) {
+        console.error('Failed to load:', e)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    load()
+  }, [router])
+
+  // Fetch timing data when Timing tab is opened
+  useEffect(() => {
+    if (activeTab === 'timing' && !timingData && !timingLoading) {
+      setTimingLoading(true)
+      fetch('/api/analytics/timing')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.data) {
+            setTimingData(data.data)
+          }
+        })
+        .catch(err => console.error('Failed to fetch timing data:', err))
+        .finally(() => setTimingLoading(false))
+    }
+  }, [activeTab, timingData, timingLoading])
+
+  // Export to PDF - programmatic generation (no html2canvas)
+  const exportToPDF = async () => {
+    setIsExporting(true)
     try {
       // Fetch timing data if not already loaded
       let currentTimingData = timingData
@@ -193,6 +230,8 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
         }
       }
       
+      const { jsPDF } = await import('jspdf')
+      
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -206,7 +245,7 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
       const addTitle = (text: string) => {
         pdf.setFontSize(18)
         pdf.setFont('helvetica', 'bold')
-        pdf.setTextColor(30, 64, 175) // blue-800
+        pdf.setTextColor(30, 64, 175)
         pdf.text(text, pageWidth / 2, y, { align: 'center' })
         y += 10
       }
@@ -245,16 +284,13 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
         pdf.setTextColor(60, 60, 60)
         pdf.text(label, x, y)
         
-        // Background bar
         pdf.setFillColor(230, 230, 230)
         pdf.rect(x, y + 2, width, 4, 'F')
         
-        // Progress bar
         const barColor = percent > 30 ? [34, 197, 94] : percent > 15 ? [245, 158, 11] : [239, 68, 68]
         pdf.setFillColor(barColor[0], barColor[1], barColor[2])
         pdf.rect(x, y + 2, width * (percent / 100), 4, 'F')
         
-        // Percentage text
         pdf.text(`${value}/${total} (${percent.toFixed(0)}%)`, x + width + 5, y + 4)
         y += 12
       }
@@ -325,11 +361,11 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
       // Follow-up alert
       if (metrics.leadsEsfriando > 0) {
         y += 5
-        pdf.setFillColor(254, 243, 199) // amber-100
+        pdf.setFillColor(254, 243, 199)
         pdf.rect(15, y - 5, pageWidth - 30, 15, 'F')
         pdf.setFontSize(10)
         pdf.setFont('helvetica', 'bold')
-        pdf.setTextColor(180, 83, 9) // amber-700
+        pdf.setTextColor(180, 83, 9)
         pdf.text(`⚠ ${metrics.leadsEsfriando} lead(s) sem contato há mais de 48h`, 20, y + 3)
         y += 15
       }
@@ -434,32 +470,15 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
       pdf.setTextColor(150, 150, 150)
       pdf.text('Gerado por CRMZap', pageWidth / 2, 285, { align: 'center' })
       
-      const today = new Date().toISOString().split('T')[0]
-      pdf.save(`relatorio-vendas-${today}.pdf`)
-    } catch (error) {
-      console.error('Error exporting PDF:', error)
+      pdf.save(`relatorio-crmzap-${new Date().toISOString().split('T')[0]}.pdf`)
+    } catch (err) {
+      console.error('Failed to export PDF:', err)
       alert('Erro ao exportar PDF. Tente novamente.')
     } finally {
-      setExporting(false)
+      setIsExporting(false)
     }
   }
 
-  // Fetch timing data when Timing tab is opened
-  useEffect(() => {
-    if (activeTab === 'timing' && !timingData && !timingLoading) {
-      setTimingLoading(true)
-      fetch('/api/analytics/timing')
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.data) {
-            setTimingData(data.data)
-          }
-        })
-        .catch(err => console.error('Failed to fetch timing data:', err))
-        .finally(() => setTimingLoading(false))
-    }
-  }, [activeTab, timingData, timingLoading])
-  
   // Calculate all metrics
   const metrics = useMemo(() => {
     const now = new Date()
@@ -480,7 +499,7 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
       const lastYear = currentMonth === 0 ? currentYear - 1 : currentYear
       return d.getMonth() === lastMonth && d.getFullYear() === lastYear
     }
-    
+
     const total = leads.length
     const byStatus = {
       novo: leads.filter(l => l.status === 'novo').length,
@@ -512,12 +531,10 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
     const variacaoLeads = leadsLastMonth > 0 ? ((leadsThisMonth - leadsLastMonth) / leadsLastMonth) * 100 : (leadsThisMonth > 0 ? 100 : 0)
     const variacaoConversao = conversaoLastMonth > 0 ? conversaoThisMonth - conversaoLastMonth : 0
     
-    // Pipeline value (leads em negociação)
     const negociando = leads.filter(l => l.status === 'negociando')
     const pipelineValue = negociando.reduce((acc, l) => acc + (l.value || 0), 0)
-    const pipelinePrevisao = pipelineValue * 0.3 // 30% probability
+    const pipelinePrevisao = pipelineValue * 0.3
     
-    // Leads by source
     const bySource: Record<LeadSource, { total: number; converted: number; value: number }> = {
       whatsapp: { total: 0, converted: 0, value: 0 },
       telegram: { total: 0, converted: 0, value: 0 },
@@ -535,7 +552,6 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
       }
     })
     
-    // Funnel conversion rates
     const funnelRates = {
       novoToContato: byStatus.novo > 0 
         ? ((byStatus.em_contato + byStatus.negociando + byStatus.fechado) / (byStatus.novo + byStatus.em_contato + byStatus.negociando + byStatus.fechado)) * 100 
@@ -548,7 +564,6 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
         : 0
     }
     
-    // Leads sem follow-up (novos há mais de 24h sem mudança de status)
     const leadsEsfriando = leads.filter(l => {
       if (l.status !== 'novo' && l.status !== 'em_contato') return false
       const created = l.createdAt ? new Date(l.createdAt) : now
@@ -589,51 +604,67 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
     { id: 'forecast', label: 'Previsão', icon: Target }
   ]
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 animate-in fade-in-0 duration-150" onClick={onClose}>
-      <div 
-        className="bg-background rounded-xl w-full max-w-3xl max-h-[85vh] overflow-hidden shadow-2xl animate-in zoom-in-95 slide-in-from-bottom-4 duration-200 flex flex-col" 
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-50 to-purple-50">
-          <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-              <BarChart3 className="w-5 h-5 text-white" />
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b">
+        <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Link href="/dashboard">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Voltar
+              </Button>
+            </Link>
+            <h1 className="font-semibold">Relatórios</h1>
+          </div>
+          <Button 
+            onClick={exportToPDF} 
+            disabled={isExporting}
+            size="sm"
+            className="gap-2"
+          >
+            {isExporting ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <FileText className="w-4 h-4" />
+            )}
+            Exportar PDF
+          </Button>
+        </div>
+      </header>
+
+      <SettingsNav />
+
+      <main className="max-w-4xl mx-auto px-4 py-6">
+        {/* Report Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+              <BarChart3 className="w-6 h-6 text-white" />
             </div>
             <div>
-              <h2 className="font-bold text-lg">Relatórios de Vendas</h2>
-              <p className="text-xs text-muted-foreground">{metrics.total} leads · Atualizado agora</p>
+              <h2 className="font-bold text-xl">Relatórios de Vendas</h2>
+              <p className="text-sm text-muted-foreground">{metrics.total} leads · Atualizado agora</p>
             </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleExportPDF}
-              disabled={exporting}
-              className="gap-2"
-            >
-              {exporting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <Download className="w-4 h-4" />
-              )}
-              {exporting ? 'Exportando...' : 'Exportar PDF'}
-            </Button>
-            <button onClick={onClose} className="p-2 hover:bg-black/5 rounded-lg transition">
-              <X className="w-5 h-5" />
-            </button>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b px-2 sm:px-4 bg-muted/30">
+        <div className="flex border-b mb-6">
           {tabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`flex items-center justify-center gap-1.5 px-3 sm:px-4 py-3 text-sm font-medium border-b-2 transition flex-1 sm:flex-none ${
+              className={`flex items-center gap-1.5 px-4 py-3 text-sm font-medium border-b-2 transition ${
                 activeTab === tab.id 
                   ? 'border-blue-500 text-blue-600' 
                   : 'border-transparent text-muted-foreground hover:text-foreground'
@@ -645,19 +676,13 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
           ))}
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4">
+        {/* Report Content */}
+        <div className="bg-background">
           {/* Overview Tab */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
-              {/* Main Stats */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <StatCard 
-                  icon={Users} 
-                  label="Total de Leads" 
-                  value={metrics.total}
-                  color="blue"
-                />
+                <StatCard icon={Users} label="Total de Leads" value={metrics.total} color="blue" />
                 <StatCard 
                   icon={Target} 
                   label="Taxa de Conversão" 
@@ -665,22 +690,12 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
                   trend={metrics.taxaConversao > 20 ? 'up' : metrics.taxaConversao < 10 ? 'down' : 'neutral'}
                   color="green"
                 />
-                <StatCard 
-                  icon={TrendingUp} 
-                  label="Em Negociação" 
-                  value={metrics.byStatus.negociando}
-                  color="purple"
-                />
-                <StatCard 
-                  icon={Zap} 
-                  label="Fechados" 
-                  value={metrics.byStatus.fechado}
-                  color="amber"
-                />
+                <StatCard icon={TrendingUp} label="Em Negociação" value={metrics.byStatus.negociando} color="purple" />
+                <StatCard icon={Zap} label="Fechados" value={metrics.byStatus.fechado} color="amber" />
               </div>
 
               {/* Month Comparison */}
-              <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 border border-blue-100">
+              <Card className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 border-blue-100">
                 <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-blue-500" />
                   Comparativo com Mês Anterior
@@ -708,10 +723,9 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Card>
 
-              {/* Source Performance */}
-              <div className="bg-muted/30 rounded-lg p-4">
+              <Card className="p-4">
                 <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
                   <Zap className="w-4 h-4 text-amber-500" />
                   Desempenho por Fonte
@@ -744,17 +758,15 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
                       )
                     })}
                 </div>
-              </div>
+              </Card>
 
-              {/* Alerts */}
               {metrics.leadsEsfriando > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
                   <div>
                     <h4 className="font-medium text-amber-800 text-sm">Leads Esfriando</h4>
                     <p className="text-xs text-amber-700 mt-1">
-                      Você tem <strong>{metrics.leadsEsfriando} lead{metrics.leadsEsfriando > 1 ? 's' : ''}</strong> sem contato há mais de 48h. 
-                      Faça follow-up para não perder a venda!
+                      Você tem <strong>{metrics.leadsEsfriando} lead{metrics.leadsEsfriando > 1 ? 's' : ''}</strong> sem contato há mais de 48h.
                     </p>
                   </div>
                 </div>
@@ -765,16 +777,14 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
           {/* Funnel Tab */}
           {activeTab === 'funnel' && (
             <div className="space-y-6">
-              {/* Visual Funnel */}
               <div className="space-y-2">
                 <h3 className="font-semibold text-sm mb-4">Funil de Conversão</h3>
-                
                 {[
                   { label: 'Novos', count: metrics.byStatus.novo, color: 'bg-blue-500', width: '100%' },
                   { label: 'Em Contato', count: metrics.byStatus.em_contato, color: 'bg-amber-500', width: '85%' },
                   { label: 'Negociando', count: metrics.byStatus.negociando, color: 'bg-purple-500', width: '60%' },
                   { label: 'Fechados', count: metrics.byStatus.fechado, color: 'bg-green-500', width: '35%' },
-                ].map((stage, idx) => (
+                ].map((stage) => (
                   <div key={stage.label} className="flex items-center gap-3">
                     <div 
                       className={`${stage.color} h-10 rounded-lg flex items-center justify-between px-4 transition-all`}
@@ -785,56 +795,27 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
                     </div>
                   </div>
                 ))}
-                
                 <div className="flex items-center gap-3">
-                  <div 
-                    className="bg-gray-300 h-10 rounded-lg flex items-center justify-between px-4"
-                    style={{ width: '25%' }}
-                  >
+                  <div className="bg-gray-300 h-10 rounded-lg flex items-center justify-between px-4" style={{ width: '25%' }}>
                     <span className="text-gray-600 text-sm font-medium">Perdidos</span>
                     <span className="text-gray-600 text-sm font-bold">{metrics.byStatus.perdido}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Conversion Rates */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-blue-50 rounded-lg p-4 text-center">
+                <Card className="p-4 text-center bg-blue-50">
                   <div className="text-2xl font-bold text-blue-600">{metrics.funnelRates.novoToContato.toFixed(0)}%</div>
                   <div className="text-xs text-blue-600/70">Novo → Contato</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Taxa de resposta inicial</div>
-                </div>
-                <div className="bg-purple-50 rounded-lg p-4 text-center">
+                </Card>
+                <Card className="p-4 text-center bg-purple-50">
                   <div className="text-2xl font-bold text-purple-600">{metrics.funnelRates.contatoToNegociando.toFixed(0)}%</div>
                   <div className="text-xs text-purple-600/70">Contato → Negociação</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Taxa de qualificação</div>
-                </div>
-                <div className="bg-green-50 rounded-lg p-4 text-center">
+                </Card>
+                <Card className="p-4 text-center bg-green-50">
                   <div className="text-2xl font-bold text-green-600">{metrics.funnelRates.negociandoToFechado.toFixed(0)}%</div>
                   <div className="text-xs text-green-600/70">Negociação → Fechado</div>
-                  <div className="text-[10px] text-muted-foreground mt-1">Taxa de fechamento</div>
-                </div>
-              </div>
-
-              {/* Follow-up Rate */}
-              <div className="bg-muted/30 rounded-lg p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <h4 className="font-medium text-sm">Taxa de Follow-up</h4>
-                  <span className={`text-sm font-bold ${metrics.taxaFollowUp > 80 ? 'text-green-600' : 'text-amber-600'}`}>
-                    {metrics.taxaFollowUp.toFixed(0)}%
-                  </span>
-                </div>
-                <ProgressBar 
-                  value={metrics.taxaFollowUp} 
-                  max={100} 
-                  color={metrics.taxaFollowUp > 80 ? 'bg-green-500' : 'bg-amber-500'}
-                  showPercent={false}
-                />
-                <p className="text-xs text-muted-foreground mt-2">
-                  {metrics.leadsEsfriando > 0 
-                    ? `${metrics.leadsEsfriando} leads aguardando follow-up`
-                    : 'Todos os leads estão sendo acompanhados!'}
-                </p>
+                </Card>
               </div>
             </div>
           )}
@@ -842,87 +823,46 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
           {/* Timing Tab */}
           {activeTab === 'timing' && (
             <div className="space-y-6">
-              {/* Loading State */}
               {timingLoading && (
                 <div className="flex items-center justify-center py-12">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                  <span className="ml-3 text-muted-foreground">Analisando mensagens...</span>
+                  <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
                 </div>
               )}
 
-              {/* No Data State */}
               {!timingLoading && timingData && timingData.totalMessages === 0 && (
-                <div className="bg-muted/30 rounded-lg p-6 text-center">
+                <Card className="p-6 text-center">
                   <Clock className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
                   <h3 className="font-medium mb-2">Sem dados suficientes</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Importe conversas do WhatsApp para ver métricas de tempo.
-                  </p>
-                </div>
+                  <p className="text-sm text-muted-foreground">Importe conversas para ver métricas.</p>
+                </Card>
               )}
 
-              {/* Data Available */}
               {!timingLoading && timingData && timingData.totalMessages > 0 && (
                 <>
-                  {/* Response Time */}
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg p-4 border border-green-200">
+                    <Card className="p-4 bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
                       <Clock className="w-5 h-5 text-green-600 mb-2" />
                       <div className="text-3xl font-bold text-green-700">
                         {timingData.avgResponseTimeMinutes !== null ? `${timingData.avgResponseTimeMinutes} min` : '—'}
                       </div>
                       <div className="text-xs text-green-600">Tempo Médio de Resposta</div>
-                      <p className="text-[10px] text-green-700/70 mt-2">
-                        {timingData.avgResponseTimeMinutes !== null ? (
-                          timingData.avgResponseTimeMinutes <= 5 
-                            ? '🎯 Excelente! Respostas rápidas aumentam conversão em 21x'
-                            : timingData.avgResponseTimeMinutes <= 15
-                            ? '👍 Bom tempo de resposta'
-                            : '⚠️ Tente responder em menos de 5 minutos'
-                        ) : 'Sem dados suficientes'}
-                      </p>
-                    </div>
-                    
-                    <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-lg p-4 border border-purple-200">
+                    </Card>
+                    <Card className="p-4 bg-gradient-to-br from-purple-50 to-violet-50 border-purple-200">
                       <Calendar className="w-5 h-5 text-purple-600 mb-2" />
                       <div className="text-3xl font-bold text-purple-700">
                         {timingData.avgCycleDays !== null ? `${timingData.avgCycleDays} dias` : '—'}
                       </div>
                       <div className="text-xs text-purple-600">Ciclo Médio de Venda</div>
-                      <p className="text-[10px] text-purple-700/70 mt-2">
-                        {timingData.avgCycleDays !== null 
-                          ? 'Tempo do primeiro contato até fechar'
-                          : 'Feche leads para calcular'}
-                      </p>
-                    </div>
+                    </Card>
                   </div>
 
-                  {/* Heat Map */}
-                  <div className="bg-muted/30 rounded-lg p-4">
+                  <Card className="p-4">
                     <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
                       <Zap className="w-4 h-4 text-amber-500" />
                       Melhores Horários para Contato
                     </h3>
                     {timingData.heatMap && <HeatMap data={timingData.heatMap} />}
-                    <div className="flex items-center justify-between mt-3 text-xs text-muted-foreground">
-                      <span>Menos ativo</span>
-                      <div className="flex gap-1">
-                        {[0.2, 0.4, 0.6, 0.8, 1].map((intensity, i) => (
-                          <div 
-                            key={i}
-                            className="w-6 h-3 rounded"
-                            style={{ backgroundColor: `rgba(34, 197, 94, ${intensity})` }}
-                          />
-                        ))}
-                      </div>
-                      <span>Mais ativo</span>
-                    </div>
-                    {timingData.bestTime && (
-                      <p className="text-xs text-center text-muted-foreground mt-3">
-                        💡 Melhor horário: <strong>{timingData.bestTime.day}, {timingData.bestTime.hour}</strong> — Seus leads respondem mais nesse período
-                      </p>
-                    )}
-                  </div>
+                  </Card>
                 </>
               )}
             </div>
@@ -931,40 +871,29 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
           {/* Forecast Tab */}
           {activeTab === 'forecast' && (
             <div className="space-y-6">
-              {/* Pipeline */}
-              <div className="bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 rounded-xl p-6 border">
+              <Card className="p-6 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50">
                 <h3 className="font-semibold text-sm mb-4 flex items-center gap-2">
                   <Target className="w-5 h-5 text-purple-500" />
                   Previsão de Receita
                 </h3>
-                
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <div className="text-xs text-muted-foreground mb-1">Pipeline Total</div>
                     <div className="text-3xl font-bold text-purple-600">
                       R$ {metrics.pipelineValue.toLocaleString('pt-BR')}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      {metrics.byStatus.negociando} leads em negociação
-                    </div>
                   </div>
-                  
                   <div>
-                    <div className="text-xs text-muted-foreground mb-1">Previsão (30% prob.)</div>
+                    <div className="text-xs text-muted-foreground mb-1">Previsão (30%)</div>
                     <div className="text-3xl font-bold text-green-600">
                       R$ {metrics.pipelinePrevisao.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      Receita esperada este mês
-                    </div>
                   </div>
                 </div>
-              </div>
+              </Card>
 
-              {/* Monthly projection */}
-              <div className="bg-muted/30 rounded-lg p-4">
+              <Card className="p-4">
                 <h4 className="font-medium text-sm mb-4">Projeção vs. Realizado</h4>
-                
                 <div className="space-y-3">
                   <div>
                     <div className="flex justify-between text-xs mb-1">
@@ -975,55 +904,44 @@ export function ReportsModal({ leads, onClose }: ReportsModalProps) {
                       <div className="h-full bg-gray-300" style={{ width: '100%' }} />
                     </div>
                   </div>
-                  
                   <div>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-green-600">Realizado</span>
                       <span className="font-medium text-green-600">R$ {metrics.valorTotal.toLocaleString('pt-BR')}</span>
                     </div>
                     <div className="h-4 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-green-500" 
-                        style={{ width: `${Math.min((metrics.valorTotal / monthlyGoal) * 100, 100)}%` }} 
-                      />
+                      <div className="h-full bg-green-500" style={{ width: `${Math.min((metrics.valorTotal / monthlyGoal) * 100, 100)}%` }} />
                     </div>
                   </div>
-                  
                   <div>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="text-purple-600">+ Previsão Pipeline</span>
                       <span className="font-medium text-purple-600">R$ {(metrics.valorTotal + metrics.pipelinePrevisao).toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</span>
                     </div>
                     <div className="h-4 bg-muted rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-green-500 to-purple-500" 
-                        style={{ width: `${Math.min(((metrics.valorTotal + metrics.pipelinePrevisao) / monthlyGoal) * 100, 100)}%` }} 
-                      />
+                      <div className="h-full bg-gradient-to-r from-green-500 to-purple-500" style={{ width: `${Math.min(((metrics.valorTotal + metrics.pipelinePrevisao) / monthlyGoal) * 100, 100)}%` }} />
                     </div>
                   </div>
                 </div>
-                
                 <p className="text-xs text-center text-muted-foreground mt-4">
                   {metrics.valorTotal + metrics.pipelinePrevisao >= monthlyGoal 
                     ? '🎉 Você está no caminho para bater a meta!'
                     : `📈 Faltam R$ ${(monthlyGoal - metrics.valorTotal - metrics.pipelinePrevisao).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} para a meta`}
                 </p>
-              </div>
+              </Card>
 
-              {/* Tips */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h4 className="font-medium text-blue-800 text-sm mb-2">💡 Dicas para aumentar conversão</h4>
+              <Card className="p-4 bg-blue-50 border-blue-200">
+                <h4 className="font-medium text-blue-800 text-sm mb-2">💡 Dicas</h4>
                 <ul className="text-xs text-blue-700 space-y-1">
                   <li>• Responda leads em menos de 5 minutos</li>
                   <li>• Faça follow-up em leads parados há mais de 24h</li>
-                  <li>• Concentre contatos entre 15h-18h (melhor horário)</li>
                   <li>• Use tags para priorizar leads com alto interesse</li>
                 </ul>
-              </div>
+              </Card>
             </div>
           )}
         </div>
-      </div>
+      </main>
     </div>
   )
 }

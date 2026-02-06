@@ -556,7 +556,26 @@ export default function SettingsPage() {
             <CardDescription>Gerencie seus dados</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Meta mensal configurável */}
             <div className="flex items-center justify-between">
+              <div>
+                <Label>Meta mensal de vendas</Label>
+                <p className="text-xs text-muted-foreground">Usada nos relatórios de previsão</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">R$</span>
+                <Input
+                  type="number"
+                  className="w-28 h-8"
+                  defaultValue={typeof window !== 'undefined' ? localStorage.getItem('whatszap-monthly-goal') || '10000' : '10000'}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value) || 10000
+                    localStorage.setItem('whatszap-monthly-goal', value.toString())
+                  }}
+                />
+              </div>
+            </div>
+            <div className="border-t pt-4 flex items-center justify-between">
               <div>
                 <Label>Exportar dados</Label>
                 <p className="text-xs text-muted-foreground">Baixe backup dos seus leads</p>

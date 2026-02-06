@@ -1,5 +1,104 @@
 # WhatsZap Bug Hunt Log
 
+## 2025-02-05 20:01 - Ciclo 9
+
+**Arquivos analisados:**
+- `src/app/reminders/page.tsx` (303 linhas)
+- `src/app/dashboard/page.tsx` (1999 linhas - completo)
+- `src/components/chat-panel.tsx` (563 linhas)
+
+**Status:** ✅ 2 bugs corrigidos e deployados
+
+**Bugs corrigidos:**
+
+### Bug #44: isAnalyzing não reseta após abort
+**Arquivo:** `chat-panel.tsx` linha ~306
+**Problema:** Quando usuário muda de lead enquanto análise AI está rodando, o `AbortController` cancela a requisição e o catch block faz `return` antes de chegar no `finally`. Resultado: `isAnalyzing` fica `true` e o botão "Analisar" fica desabilitado permanentemente.
+**Cenário reprodutor:**
+1. Usuário abre conversa do Lead A
+2. Clica em "Analisar" 
+3. Antes de terminar, clica em Lead B
+4. Volta pro Lead A → botão "Analisar" está desabilitado
+**Solução:** Adicionado `setIsAnalyzing(false)` antes do `return` no handler de `AbortError`.
+
+### Bug #45: Media patterns não incluíam termos em inglês
+**Arquivo:** `chat-panel.tsx` linhas ~78-120
+**Problema:** O regex de detecção de mídia só tinha termos em português (`mídia`, `imagem`, `localização`). A Evolution API pode enviar markers em inglês (`[location]`, `[image]`, `[document]`), que apareciam como texto literal em vez de ícones.
+**Impacto:** UX inconsistente - algumas mídias mostravam ícone, outras texto bruto.
+**Solução:** Expandido regex para incluir variantes em inglês: `media`, `image`, `photo`, `location`, `document`, `file`, `voice`, `contact`. Atualizada lógica de ícones para detectar ambos os idiomas.
+
+**Deploy:** ✅ https://whatszap-zeta.vercel.app
+
+---
+
+## 2025-02-05 18:30 - Ciclo 8
+
+**Arquivos analisados:**
+- `src/app/reminders/page.tsx` (303 linhas)
+- `src/app/dashboard/page.tsx` (1987 linhas - completo)
+- `src/components/chat-panel.tsx` (550 linhas)
+
+**Status:** ✅ 1 bug corrigido e deployado
+
+**Bug corrigido:**
+
+### Bug #40: Timezone incorreto no atributo `min` do datetime-local
+**Arquivo:** `dashboard/page.tsx` linha ~1853 (reminder modal)
+**Problema:** O atributo `min` usava `toISOString().slice(0, 16)` que converte para UTC. Em Fortaleza (GMT-3), se são 18:30 local, o `min` seria 21:35 (UTC) - permitindo datas "no passado" localmente.
+**Cenário:** Às 18:30 no Brasil, usuário podia selecionar qualquer hora entre 18:30 e 21:35 porque o `min` estava em UTC.
+**Solução:** Substituído por formatação manual usando `getHours()`, `getMinutes()`, etc. que preservam timezone local.
+
+**Deploy:** ✅ https://whatszap-zeta.vercel.app
+
+---
+
+## 2025-02-05 18:00 - Ciclo 7
+
+**Arquivos analisados:**
+- `src/app/reminders/page.tsx` (303 linhas)
+- `src/app/dashboard/page.tsx` (1973 linhas - completo)
+- `src/components/chat-panel.tsx` (550 linhas)
+
+**Status:** ✅ 1 bug corrigido e deployado
+
+**Bug corrigido:**
+
+### Bug #39: Timezone incorreto ao editar lembrete existente
+**Arquivo:** `dashboard/page.tsx` linha ~1759
+**Problema:** Ao abrir modal para editar lembrete existente, o código usava `date.toISOString().slice(0, 16)` que converte para UTC. Se lembrete estava às 14:00 local (GMT-3), mostrava 17:00 no input.
+**Impacto:** Usuário via hora errada e podia salvar hora diferente da intencionada.
+**Solução:** Substituído por formatação manual usando `getFullYear()`, `getMonth()`, `getDate()`, `getHours()`, `getMinutes()` que mantém timezone local.
+
+**Deploy:** ✅ https://whatszap-zeta.vercel.app
+
+---
+
+## 2025-02-05 16:06 - Ciclo 6
+
+**Arquivos analisados:**
+- `src/app/reminders/page.tsx` (303 linhas)
+- `src/app/dashboard/page.tsx` (1918 linhas - completo)
+- `src/components/chat-panel.tsx` (550 linhas)
+
+**Status:** ✅ 1 bug corrigido e deployado
+
+**Bug corrigido:**
+
+### Bug #33: tagLead desincroniza quando tags são atualizadas externamente
+**Arquivo:** `dashboard/page.tsx`
+**Problema:** Quando o modal de tags está aberto e a AI analysis atualiza as tags do lead (via `onTagsUpdate`), o estado `tagLead` não era sincronizado. O modal mostrava tags antigas e podia sobrescrever as tags adicionadas pela AI quando o usuário interagia.
+**Cenário reprodutor:**
+1. Usuário abre modal de tags para lead X
+2. Clica "Analisar" no chat-panel
+3. AI termina e adiciona tag "Interesse: Alto" via `onTagsUpdate`
+4. Modal ainda mostra tags antigas
+5. Usuário clica em qualquer tag → perde "Interesse: Alto" da AI
+**Solução:** Adicionado useEffect para sincronizar `tagLead` com `leads` quando tags mudam externamente enquanto o modal está aberto.
+
+**Deploy:** ✅ https://whatszap-zeta.vercel.app
+
+---
+
 ## 2025-02-05 13:30 - Ciclo 5
 
 **Arquivos analisados:**
