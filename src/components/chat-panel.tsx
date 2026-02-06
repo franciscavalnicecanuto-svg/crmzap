@@ -247,6 +247,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   }, [lead?.phone])
 
   // Bug fix #92: Keyboard shortcuts for quick replies (Alt+1 through Alt+7)
+  // UX #123: Added Ctrl+R to refresh messages, Ctrl+Shift+A to analyze
   useEffect(() => {
     if (!lead || !isConnected) return
     
@@ -260,7 +261,8 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
       'Obrigado pelo contato!',
     ]
     
-    const handleQuickReplyShortcut = (e: KeyboardEvent) => {
+    const handleKeyboardShortcuts = (e: KeyboardEvent) => {
+      // Alt+1-7 for quick replies
       if (e.altKey && e.key >= '1' && e.key <= '7') {
         e.preventDefault()
         const idx = parseInt(e.key) - 1
@@ -269,12 +271,31 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
           // Haptic feedback
           if ('vibrate' in navigator) navigator.vibrate(10)
         }
+        return
+      }
+      
+      // Ctrl+R to refresh messages (without browser reload)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'r' && !e.shiftKey) {
+        e.preventDefault()
+        fetchMessages(true)
+        if ('vibrate' in navigator) navigator.vibrate(10)
+        return
+      }
+      
+      // Ctrl+Shift+A to trigger AI analysis (computed inline to avoid dependency issue)
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'A') {
+        e.preventDefault()
+        const canAnalyzeNow = lead && !['fechado', 'perdido'].includes(lead.status || '')
+        if (canAnalyzeNow && !isAnalyzing) {
+          handleAnalyze()
+        }
+        return
       }
     }
     
-    window.addEventListener('keydown', handleQuickReplyShortcut)
-    return () => window.removeEventListener('keydown', handleQuickReplyShortcut)
-  }, [lead?.phone, isConnected])
+    window.addEventListener('keydown', handleKeyboardShortcuts)
+    return () => window.removeEventListener('keydown', handleKeyboardShortcuts)
+  }, [lead?.phone, lead?.status, isConnected, isAnalyzing])
 
   const fetchMessages = async (showLoading: boolean, isRetry: boolean = false) => {
     if (!lead) return
@@ -555,13 +576,28 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
       const data = await res.json()
       
       if (data.success) {
+        const sentMessageId = data.messageId || Date.now().toString()
         setMessages(prev => [...prev, {
-          id: data.messageId || Date.now().toString(),
+          id: sentMessageId,
           text: newMessage.trim(),
           fromMe: true,
           timestamp: new Date().toISOString(),
         }])
         setNewMessage('')
+        
+        // UX #124: Visual success feedback - scroll to bottom with animation
+        setTimeout(() => {
+          scrollToBottom(true)
+          // Flash effect on the sent message
+          const msgElement = document.querySelector(`[data-message-id="${sentMessageId}"]`)
+          if (msgElement) {
+            msgElement.classList.add('message-sent-flash')
+            setTimeout(() => msgElement.classList.remove('message-sent-flash'), 500)
+          }
+        }, 100)
+        
+        // Haptic feedback on success
+        if ('vibrate' in navigator) navigator.vibrate([10, 50, 10])
         
         // Log action
         if (lead) {
@@ -1019,18 +1055,25 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
                   {group.messages.map((msg) => (
                     <div
                       key={msg.id}
+                      data-message-id={msg.id}
                       className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'} animate-in fade-in-0 slide-in-from-bottom-2 duration-200`}
                     >
                       <div
-                        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm ${
+                        className={`max-w-[80%] rounded-lg px-3 py-2 text-sm transition-colors ${
                           msg.fromMe
                             ? 'bg-green-500 text-white'
                             : 'bg-muted'
                         }`}
                       >
                         {renderMessageContent(msg.text, msg.fromMe)}
-                        <p className={`text-[10px] mt-1 ${msg.fromMe ? 'text-green-100' : 'text-muted-foreground'}`}>
+                        <p className={`text-[10px] mt-1 flex items-center gap-1 ${msg.fromMe ? 'text-green-100' : 'text-muted-foreground'}`}>
                           {formatTime(msg.timestamp)}
+                          {/* UX #125: Show sent indicator for own messages */}
+                          {msg.fromMe && (
+                            <svg className="w-3 h-3 inline-block" viewBox="0 0 16 16" fill="currentColor">
+                              <path d="M12.354 5.354a.5.5 0 0 0-.708-.708L6.5 9.793 4.354 7.646a.5.5 0 1 0-.708.708l2.5 2.5a.5.5 0 0 0 .708 0l5.5-5.5z"/>
+                            </svg>
+                          )}
                         </p>
                       </div>
                     </div>

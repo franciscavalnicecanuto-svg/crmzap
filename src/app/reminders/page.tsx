@@ -72,6 +72,7 @@ export default function RemindersPage() {
   }
 
   // Bug fix: markAsDone now records completion before clearing
+  // UX #126: Added toast feedback for completed reminders
   const markAsDone = (leadId: string) => {
     const lead = leads.find(l => l.id === leadId)
     if (lead) {
@@ -87,8 +88,43 @@ export default function RemindersPage() {
       })
       // Keep only last 50 completed reminders
       localStorage.setItem('whatszap-completed-reminders', JSON.stringify(history.slice(0, 50)))
+      
+      // Haptic feedback
+      if ('vibrate' in navigator) navigator.vibrate([10, 30, 10])
     }
     clearReminder(leadId)
+  }
+  
+  // UX #127: Bulk actions for reminders
+  const markAllOverdueAsDone = () => {
+    const overdueLeads = filteredLeads.filter(l => getReminderStatus(l.reminderDate!) === 'overdue')
+    if (overdueLeads.length === 0) return
+    
+    overdueLeads.forEach(lead => {
+      // Save to history
+      const history = JSON.parse(localStorage.getItem('whatszap-completed-reminders') || '[]')
+      history.unshift({
+        leadId: lead.id,
+        leadName: lead.name,
+        phone: lead.phone,
+        reminderDate: lead.reminderDate,
+        reminderNote: lead.reminderNote,
+        completedAt: new Date().toISOString()
+      })
+      localStorage.setItem('whatszap-completed-reminders', JSON.stringify(history.slice(0, 50)))
+    })
+    
+    // Clear all overdue reminders
+    const updated = leads.map(l => 
+      overdueLeads.some(ol => ol.id === l.id) 
+        ? { ...l, reminderDate: undefined, reminderNote: undefined } 
+        : l
+    )
+    setLeads(updated)
+    localStorage.setItem('whatszap-leads-v3', JSON.stringify(updated))
+    
+    // Haptic feedback
+    if ('vibrate' in navigator) navigator.vibrate([10, 50, 10, 50, 10])
   }
 
   // Filter leads with reminders
@@ -229,41 +265,64 @@ export default function RemindersPage() {
         <div className="grid grid-cols-4 gap-3 mb-6">
           <button 
             onClick={() => setFilter('all')}
-            className={`p-3 rounded-lg border text-center transition ${
+            className={`p-3 rounded-lg border text-center transition focus:outline-none focus:ring-2 focus:ring-amber-500 ${
               filter === 'all' ? 'border-amber-500 bg-amber-50' : 'hover:bg-muted/50'
             }`}
+            aria-pressed={filter === 'all'}
           >
             <div className="text-2xl font-bold">{stats.total}</div>
             <div className="text-xs text-muted-foreground">Total</div>
           </button>
           <button 
             onClick={() => setFilter('overdue')}
-            className={`p-3 rounded-lg border text-center transition ${
+            className={`p-3 rounded-lg border text-center transition focus:outline-none focus:ring-2 focus:ring-red-500 ${
               filter === 'overdue' ? 'border-red-500 bg-red-50' : 'hover:bg-muted/50'
             }`}
+            aria-pressed={filter === 'overdue'}
           >
             <div className="text-2xl font-bold text-red-600">{stats.overdue}</div>
             <div className="text-xs text-muted-foreground">Atrasados</div>
           </button>
           <button 
             onClick={() => setFilter('today')}
-            className={`p-3 rounded-lg border text-center transition ${
+            className={`p-3 rounded-lg border text-center transition focus:outline-none focus:ring-2 focus:ring-amber-500 ${
               filter === 'today' ? 'border-amber-500 bg-amber-50' : 'hover:bg-muted/50'
             }`}
+            aria-pressed={filter === 'today'}
           >
             <div className="text-2xl font-bold text-amber-600">{stats.today}</div>
             <div className="text-xs text-muted-foreground">Hoje</div>
           </button>
           <button 
             onClick={() => setFilter('upcoming')}
-            className={`p-3 rounded-lg border text-center transition ${
+            className={`p-3 rounded-lg border text-center transition focus:outline-none focus:ring-2 focus:ring-blue-500 ${
               filter === 'upcoming' ? 'border-blue-500 bg-blue-50' : 'hover:bg-muted/50'
             }`}
+            aria-pressed={filter === 'upcoming'}
           >
             <div className="text-2xl font-bold text-blue-600">{stats.upcoming}</div>
             <div className="text-xs text-muted-foreground">Próximos</div>
           </button>
         </div>
+        
+        {/* UX #128: Bulk action for overdue reminders */}
+        {filter === 'overdue' && stats.overdue > 1 && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
+            <div className="flex items-center gap-2 text-red-700 text-sm">
+              <AlertCircle className="w-4 h-4" />
+              <span>{stats.overdue} lembretes atrasados</span>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              className="border-red-300 text-red-700 hover:bg-red-100"
+              onClick={markAllOverdueAsDone}
+            >
+              <CheckCircle className="w-3 h-3 mr-1" />
+              Marcar todos como feito
+            </Button>
+          </div>
+        )}
 
         {/* Search */}
         <div className="mb-4">

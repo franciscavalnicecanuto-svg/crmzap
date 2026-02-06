@@ -1634,9 +1634,11 @@ function DashboardContent() {
                   <div 
                     key={status}
                     className={`flex-shrink-0 w-44 md:w-40 flex flex-col transition-all duration-150 snap-start ${
-                      dragOverColumn === status ? 'scale-[1.02] opacity-100' : draggedLead ? 'opacity-70' : ''
+                      dragOverColumn === status ? 'scale-[1.02] opacity-100 drop-zone-active' : draggedLead ? 'opacity-70' : ''
                     }`}
                     data-status={status}
+                    role="region"
+                    aria-label={`Coluna ${column.label} com ${statusLeads.length} leads`}
                     onDragOver={(e) => handleDragOver(e, status)}
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, status)}
@@ -1662,17 +1664,27 @@ function DashboardContent() {
                           return (
                             <Card 
                               key={lead.id}
-                              className={`${settings.compactView ? 'p-1.5' : 'p-2'} cursor-pointer hover:shadow-md transition-all active:scale-[0.97] active:bg-gray-100 group relative min-h-[44px] touch-manipulation ${
+                              className={`${settings.compactView ? 'p-1.5' : 'p-2'} cursor-pointer hover:shadow-md transition-all active:scale-[0.97] active:bg-gray-100 group relative min-h-[44px] touch-manipulation lead-card-hover ${
                                 selectedLead?.id === lead.id 
                                   ? 'ring-2 ring-green-500 shadow-md' 
                                   : hasUnread 
                                     ? 'bg-green-50 border-green-300 shadow-sm' 
                                     : ''
-                              }`}
+                              } ${draggedLead === lead.id ? 'dragging-card' : ''}`}
                               draggable
+                              role="button"
+                              tabIndex={0}
+                              aria-label={`${lead.name}${hasUnread ? ', mensagem não lida' : ''}${lead.reminderDate ? ', tem lembrete' : ''}`}
+                              aria-selected={selectedLead?.id === lead.id}
                               onDragStart={(e) => handleDragStart(e, lead)}
                               onDragEnd={handleDragEnd}
                               onClick={() => handleCardClick(lead)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  handleCardClick(lead)
+                                }
+                              }}
                             >
                               <div className={`flex items-center ${settings.compactView ? 'gap-1' : 'gap-1.5'}`}>
                                 <div className="relative shrink-0">

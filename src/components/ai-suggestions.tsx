@@ -145,13 +145,32 @@ export function AISuggestions({ messages, leadName, onSelectSuggestion }: AISugg
     }
   }, [messages, leadName, cooldown])
 
-  // Cleanup on unmount
+  // Bug fix #129: Proper cleanup on unmount - clear all intervals and abort controllers
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort()
-      if (cooldownIntervalRef.current) clearInterval(cooldownIntervalRef.current)
+      abortControllerRef.current = null
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current)
+        cooldownIntervalRef.current = null
+      }
     }
   }, [])
+  
+  // Bug fix #130: Reset cooldown and suggestions when lead changes (detected via messages reset)
+  useEffect(() => {
+    if (messages.length === 0) {
+      setSuggestions([])
+      setIntent(null)
+      setIntentLabel(null)
+      setError(null)
+      setCooldown(0)
+      if (cooldownIntervalRef.current) {
+        clearInterval(cooldownIntervalRef.current)
+        cooldownIntervalRef.current = null
+      }
+    }
+  }, [messages.length === 0])
 
   // Bug fix #86: Auto-fetch with debounce when new message from client arrives
   useEffect(() => {
