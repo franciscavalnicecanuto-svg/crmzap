@@ -183,6 +183,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   const [contextMenuMessageId, setContextMenuMessageId] = useState<string | null>(null) // UX #201: Message context menu
   const [phoneCopied, setPhoneCopied] = useState(false) // Bug fix #271: Phone copy state
   const [conversationCopied, setConversationCopied] = useState(false) // UX #501: Copy entire conversation
+  const [selectedQuickReply, setSelectedQuickReply] = useState<number | null>(null) // UX #512: Visual feedback on quick reply selection
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<Message[]>([]) // Bug fix #14: Track messages for comparison
@@ -1645,10 +1646,17 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
                   key={idx}
                   variant="outline"
                   size="sm"
-                  className="h-8 px-2 text-xs whitespace-nowrap shrink-0 hover:bg-green-100 hover:border-green-400 hover:text-green-800 hover:shadow-sm active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:ring-offset-1 snap-start touch-manipulation min-w-[60px]"
+                  className={`h-8 px-2 text-xs whitespace-nowrap shrink-0 hover:bg-green-100 hover:border-green-400 hover:text-green-800 hover:shadow-sm active:scale-95 transition-all focus:ring-2 focus:ring-green-300 focus:ring-offset-1 snap-start touch-manipulation min-w-[60px] ${
+                    selectedQuickReply === idx 
+                      ? 'bg-green-500 text-white border-green-500 quick-reply-pressed' 
+                      : ''
+                  }`}
                   onClick={() => {
+                    setSelectedQuickReply(idx)
                     setNewMessage(reply.text)
                     if ('vibrate' in navigator) navigator.vibrate(10)
+                    // Clear selection after animation
+                    setTimeout(() => setSelectedQuickReply(null), 200)
                   }}
                   disabled={isSending}
                   title={`${reply.text} (Alt+${reply.shortcut})`}
