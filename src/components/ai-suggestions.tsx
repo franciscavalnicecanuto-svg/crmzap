@@ -157,14 +157,21 @@ export function AISuggestions({ messages, leadName, onSelectSuggestion }: AISugg
   }, [debouncedMessages.length, lastMessageCount, fetchSuggestions, cooldown])
 
   // UX #66: Don't show anything if minimized
+  // UX #97: Show minimized state with unread indicator if new suggestions available
   if (isMinimized) {
     return (
       <button
         onClick={() => setIsMinimized(false)}
-        className="border-t bg-gradient-to-r from-purple-50/50 to-blue-50/50 p-2 flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
+        className="border-t bg-gradient-to-r from-purple-50/50 to-blue-50/50 p-2 flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-purple-50 transition-colors w-full group"
+        aria-label="Mostrar sugestões de resposta da IA"
       >
-        <Sparkles className="w-3 h-3" />
-        Mostrar sugestões IA
+        <Sparkles className="w-3 h-3 group-hover:animate-pulse" />
+        <span>Mostrar sugestões IA</span>
+        {suggestions.length > 0 && (
+          <span className="px-1.5 py-0.5 bg-purple-500 text-white text-[10px] font-medium rounded-full">
+            {suggestions.length}
+          </span>
+        )}
       </button>
     )
   }

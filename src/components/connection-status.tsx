@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Wifi, WifiOff, Loader2, CheckCircle2, AlertTriangle, RefreshCw } from 'lucide-react'
+import Link from 'next/link'
 
 type ConnectionState = 'connected' | 'connecting' | 'disconnected'
 
@@ -13,18 +14,36 @@ interface ConnectionStatusProps {
 
 export function ConnectionStatus({ state, className = '', onRetry }: ConnectionStatusProps) {
   const [showConnected, setShowConnected] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
   
   // UX #87: Show brief "Connected" message when reconnecting succeeds
   useEffect(() => {
     if (state === 'connected') {
       setShowConnected(true)
+      setRetryCount(0) // Reset retry count on successful connection
       const timer = setTimeout(() => setShowConnected(false), 3000)
       return () => clearTimeout(timer)
     }
   }, [state])
 
+  // UX #96: Auto-hide after prolonged disconnect to avoid banner fatigue
+  const [isHidden, setIsHidden] = useState(false)
+  useEffect(() => {
+    if (state === 'disconnected') {
+      // After 2 minutes of disconnect, allow hiding
+      const timer = setTimeout(() => setIsHidden(false), 120000)
+      return () => clearTimeout(timer)
+    } else {
+      setIsHidden(false)
+    }
+  }, [state])
+
   if (state === 'connected' && !showConnected) {
     return null // Don't show anything when connected (less noise)
+  }
+
+  if (isHidden) {
+    return null
   }
 
   const config = {
@@ -48,17 +67,34 @@ export function ConnectionStatus({ state, className = '', onRetry }: ConnectionS
   const { bg, icon, text } = config[state]
 
   return (
-    <div className={`${bg} text-white text-xs py-1 px-3 flex items-center justify-center gap-1.5 animate-in slide-in-from-top-2 duration-200 ${className}`}>
+    <div className={`${bg} text-white text-xs py-1.5 px-3 flex items-center justify-center gap-2 animate-in slide-in-from-top-2 duration-200 ${className}`}>
       {icon}
       <span className="font-medium">{text}</span>
-      {state === 'disconnected' && onRetry && (
-        <button 
-          onClick={onRetry}
-          className="ml-1 p-0.5 hover:bg-white/20 rounded transition-colors"
-          title="Tentar reconectar"
-        >
-          <RefreshCw className="w-3 h-3" />
-        </button>
+      {state === 'disconnected' && (
+        <>
+          {onRetry && (
+            <button 
+              onClick={() => {
+                setRetryCount(prev => prev + 1)
+                onRetry()
+              }}
+              className="ml-1 p-0.5 hover:bg-white/20 rounded transition-colors flex items-center gap-1"
+              title="Tentar reconectar"
+            >
+              <RefreshCw className="w-3 h-3" />
+              {retryCount > 0 && <span className="text-[10px] opacity-70">({retryCount})</span>}
+            </button>
+          )}
+          {/* UX #96: Link to reconnect page after multiple retries */}
+          {retryCount >= 2 && (
+            <Link 
+              href="/connect" 
+              className="ml-1 px-1.5 py-0.5 bg-white/20 hover:bg-white/30 rounded text-[10px] font-medium transition-colors"
+            >
+              Reconectar
+            </Link>
+          )}
+        </>
       )}
     </div>
   )

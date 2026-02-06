@@ -64,8 +64,8 @@ export function EmptyState({ type, onAction, actionLabel, secondaryAction, secon
 
   return (
     <div className="flex flex-col items-center justify-center p-8 text-center animate-in fade-in-0 slide-in-from-bottom-4 duration-300">
-      {/* Animated Illustrated Icon */}
-      <div className={`relative w-24 h-24 rounded-full bg-gradient-to-br ${config.gradient} flex items-center justify-center mb-5 animate-pulse`}>
+      {/* Illustrated Icon - UX #94: Removed aggressive pulse animation */}
+      <div className={`relative w-24 h-24 rounded-full bg-gradient-to-br ${config.gradient} flex items-center justify-center mb-5`}>
         <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/20 to-transparent" />
         <div className="w-16 h-16 rounded-full bg-background/90 flex items-center justify-center shadow-lg backdrop-blur-sm">
           <Icon className="w-8 h-8 text-muted-foreground" />

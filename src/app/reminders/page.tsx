@@ -342,30 +342,41 @@ export default function RemindersPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2">
-                      {/* UX #78/#82: Quick Snooze buttons for passed reminders with more options */}
+                      {/* UX #78/#82/#95: Quick Snooze buttons for passed reminders with more options */}
+                      {/* Bug fix #95: Use local timezone-aware date formatting instead of toISOString() */}
                       {status === 'overdue' && (
                         <div className="flex items-center gap-1 flex-wrap">
                           {(() => {
-                            // Helper function to get tomorrow 9am
+                            // Helper function to format date in local timezone for datetime-local input
+                            const toLocalISOString = (date: Date) => {
+                              const year = date.getFullYear()
+                              const month = String(date.getMonth() + 1).padStart(2, '0')
+                              const day = String(date.getDate()).padStart(2, '0')
+                              const hours = String(date.getHours()).padStart(2, '0')
+                              const minutes = String(date.getMinutes()).padStart(2, '0')
+                              return `${year}-${month}-${day}T${hours}:${minutes}`
+                            }
+                            
+                            // Helper function to get tomorrow 9am in local time
                             const getTomorrow9am = () => {
                               const tomorrow = new Date()
                               tomorrow.setDate(tomorrow.getDate() + 1)
                               tomorrow.setHours(9, 0, 0, 0)
-                              return tomorrow.toISOString()
+                              return toLocalISOString(tomorrow)
                             }
-                            // Helper function to get next Monday 9am
+                            // Helper function to get next Monday 9am in local time
                             const getNextMonday9am = () => {
                               const today = new Date()
                               const daysUntilMonday = (8 - today.getDay()) % 7 || 7
                               const monday = new Date(today)
                               monday.setDate(today.getDate() + daysUntilMonday)
                               monday.setHours(9, 0, 0, 0)
-                              return monday.toISOString()
+                              return toLocalISOString(monday)
                             }
                             
                             const snoozeOptions = [
-                              { label: '1h', getDate: () => new Date(Date.now() + 60 * 60 * 1000).toISOString(), title: 'Adiar 1 hora' },
-                              { label: '3h', getDate: () => new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(), title: 'Adiar 3 horas' },
+                              { label: '1h', getDate: () => toLocalISOString(new Date(Date.now() + 60 * 60 * 1000)), title: 'Adiar 1 hora' },
+                              { label: '3h', getDate: () => toLocalISOString(new Date(Date.now() + 3 * 60 * 60 * 1000)), title: 'Adiar 3 horas' },
                               { label: 'Amanhã', getDate: getTomorrow9am, title: 'Amanhã às 9h' },
                               { label: 'Seg', getDate: getNextMonday9am, title: 'Segunda às 9h' },
                             ]

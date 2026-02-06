@@ -236,6 +236,36 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
     setShowScrollButton(false)
   }, [lead?.phone])
 
+  // Bug fix #92: Keyboard shortcuts for quick replies (Alt+1 through Alt+7)
+  useEffect(() => {
+    if (!lead || !isConnected) return
+    
+    const quickReplies = [
+      'Olá! Tudo bem?',
+      'Um momento, por favor',
+      'Perfeito!',
+      'Posso te ligar?',
+      'Podemos agendar?',
+      'Vou verificar os valores',
+      'Obrigado pelo contato!',
+    ]
+    
+    const handleQuickReplyShortcut = (e: KeyboardEvent) => {
+      if (e.altKey && e.key >= '1' && e.key <= '7') {
+        e.preventDefault()
+        const idx = parseInt(e.key) - 1
+        if (quickReplies[idx]) {
+          setNewMessage(quickReplies[idx])
+          // Haptic feedback
+          if ('vibrate' in navigator) navigator.vibrate(10)
+        }
+      }
+    }
+    
+    window.addEventListener('keydown', handleQuickReplyShortcut)
+    return () => window.removeEventListener('keydown', handleQuickReplyShortcut)
+  }, [lead?.phone, isConnected])
+
   const fetchMessages = async (showLoading: boolean) => {
     if (!lead) return
     
@@ -442,7 +472,8 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
     
     setIsLoadingHistory(true) // Bug fix #22: Show loading state
     try {
-      const res = await fetch(`/api/ai/history?phone=${lead.phone}&limit=5`)
+      // Bug fix #91: URL encode phone to handle special characters (+, spaces)
+      const res = await fetch(`/api/ai/history?phone=${encodeURIComponent(lead.phone)}&limit=5`)
       const data = await res.json()
       if (data.success) {
         setAnalysisHistory(data.analyses || [])
@@ -543,16 +574,29 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   }
   
   // UX #77: Group messages by date
+  // Bug fix #93: Handle messages without timestamp by grouping with previous message's date
+  // Bug fix #96: Don't create new group for consecutive messages without timestamps
   const getMessagesByDate = (messages: Message[]) => {
     const groups: { date: string; messages: Message[] }[] = []
     let currentDate = ''
+    let lastValidTimestamp = ''
     
     for (const msg of messages) {
-      const msgDate = msg.timestamp ? new Date(msg.timestamp).toDateString() : 'unknown'
+      // Use last valid timestamp if current message has none
+      const effectiveTimestamp = msg.timestamp || lastValidTimestamp
+      if (msg.timestamp) {
+        lastValidTimestamp = msg.timestamp
+      }
       
-      if (msgDate !== currentDate) {
+      const msgDate = effectiveTimestamp ? new Date(effectiveTimestamp).toDateString() : ''
+      
+      // Create new group only if:
+      // 1. First message (no groups yet)
+      // 2. Date is non-empty AND different from current group
+      // This prevents creating multiple groups for consecutive messages without timestamps
+      if (groups.length === 0 || (msgDate !== '' && msgDate !== currentDate)) {
         currentDate = msgDate
-        groups.push({ date: msg.timestamp || '', messages: [msg] })
+        groups.push({ date: effectiveTimestamp, messages: [msg] })
       } else {
         groups[groups.length - 1].messages.push(msg)
       }
@@ -574,7 +618,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
 
   return (
     <div className="h-full flex flex-col bg-background">
-      {/* Header */}
+      {/* Header - UX #98: Improved with connection indicator and last seen */}
       <div className="flex items-center justify-between p-3 border-b">
         <div className="flex items-center gap-2">
           {/* Mobile back button */}
@@ -583,20 +627,44 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
             size="icon" 
             className="h-8 w-8 md:hidden -ml-1"
             onClick={onClose}
+            aria-label="Voltar para lista de leads"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <Avatar className="h-8 w-8">
-            {lead.profilePicUrl && (
-              <AvatarImage src={lead.profilePicUrl} alt={lead.name} />
+          <div className="relative">
+            <Avatar className="h-8 w-8">
+              {lead.profilePicUrl && (
+                <AvatarImage src={lead.profilePicUrl} alt={lead.name} />
+              )}
+              <AvatarFallback className="bg-green-100 text-green-700 text-xs">
+                {lead.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            {/* UX #98: Connection indicator dot */}
+            {isConnected && (
+              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 border-2 border-background rounded-full" aria-label="Conectado" />
             )}
-            <AvatarFallback className="bg-green-100 text-green-700 text-xs">
-              {lead.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          </div>
           <div>
             <h3 className="font-medium text-sm">{lead.name}</h3>
-            <p className="text-xs text-muted-foreground">{lead.phone}</p>
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              {lead.phone}
+              {/* UX #98: Show last message time if available */}
+              {messages.length > 0 && messages[messages.length - 1]?.timestamp && (
+                <span className="text-[10px] opacity-60">
+                  · {(() => {
+                    const lastTs = new Date(messages[messages.length - 1].timestamp!)
+                    const now = new Date()
+                    const diffMins = Math.floor((now.getTime() - lastTs.getTime()) / 60000)
+                    if (diffMins < 1) return 'agora'
+                    if (diffMins < 60) return `${diffMins}m atrás`
+                    const diffHours = Math.floor(diffMins / 60)
+                    if (diffHours < 24) return `${diffHours}h atrás`
+                    return lastTs.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                  })()}
+                </span>
+              )}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-1">
