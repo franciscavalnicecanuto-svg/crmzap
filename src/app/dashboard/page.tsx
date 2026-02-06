@@ -133,6 +133,22 @@ const getRelativeTime = (dateStr: string | undefined): string | null => {
   }
 }
 
+// UX #330: Calculate days in current status (for stale lead detection)
+const getDaysInStatus = (lead: Lead): number | null => {
+  // We use createdAt as proxy for when lead entered current status
+  // In a full implementation, we'd track statusChangedAt separately
+  if (!lead.createdAt) return null
+  try {
+    const createdDate = new Date(lead.createdAt)
+    if (isNaN(createdDate.getTime())) return null
+    const diffMs = Date.now() - createdDate.getTime()
+    if (diffMs < 0) return null
+    return Math.floor(diffMs / 86400000) // Days
+  } catch {
+    return null
+  }
+}
+
 const getTagColor = (tag: string) => {
   const found = TAG_OPTIONS.find(t => t.label === tag)
   return found?.color || 'bg-gray-500/20 text-gray-400 border-gray-500/30'
@@ -2241,6 +2257,24 @@ function DashboardContent() {
                                         {!settings.compactView && '3d+'}
                                       </span>
                                     )}
+                                    {/* UX #330: Days in status indicator - show for leads 5+ days in same status */}
+                                    {!isCooling && !hasUnread && (() => {
+                                      const days = getDaysInStatus(lead)
+                                      if (!days || days < 5) return null
+                                      const isStale = days >= 7
+                                      return (
+                                        <span 
+                                          className={`text-[7px] px-1 py-0.5 rounded-full font-medium days-badge ${
+                                            isStale 
+                                              ? 'days-badge-danger text-red-600' 
+                                              : 'days-badge-warning text-amber-700'
+                                          }`}
+                                          title={`${days} dias neste status - considere atualizar ou fazer follow-up`}
+                                        >
+                                          {days}d
+                                        </span>
+                                      )
+                                    })()}
                                     {/* UX #85: Enhanced reminder indicator with urgency levels */}
                                     {lead.reminderDate && (() => {
                                       const reminderTime = new Date(lead.reminderDate).getTime()
@@ -2375,21 +2409,77 @@ function DashboardContent() {
                                 >
                                   <Tag className="w-3 h-3" />
                                 </button>
+                                {/* UX #331: Quick reminder dropdown - 1h or custom */}
                                 {!lead.reminderDate && (
-                                  <button 
-                                    onClick={(e) => {
-                                      e.stopPropagation()
-                                      setReminderLead(lead)
-                                      // Bug fix #34: Clear date for new reminders (no pre-populate needed here)
-                                      setReminderDate('')
-                                      setReminderNote('')
-                                      setShowReminderModal(true)
-                                    }}
-                                    className="p-1 rounded bg-background/80 hover:bg-muted transition"
-                                    title="Criar lembrete"
-                                  >
-                                    <Plus className="w-3 h-3" />
-                                  </button>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button 
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="p-1 rounded bg-background/80 hover:bg-amber-100 hover:text-amber-700 transition"
+                                        title="Criar lembrete"
+                                      >
+                                        <Bell className="w-3 h-3" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent 
+                                      align="end" 
+                                      className="w-32"
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      <DropdownMenuItem onClick={() => {
+                                        // Quick 1h reminder
+                                        const inOneHour = new Date(Date.now() + 60 * 60 * 1000)
+                                        const year = inOneHour.getFullYear()
+                                        const month = String(inOneHour.getMonth() + 1).padStart(2, '0')
+                                        const day = String(inOneHour.getDate()).padStart(2, '0')
+                                        const hours = String(inOneHour.getHours()).padStart(2, '0')
+                                        const mins = String(inOneHour.getMinutes()).padStart(2, '0')
+                                        addReminder(lead.id, `${year}-${month}-${day}T${hours}:${mins}`, '')
+                                        if ('vibrate' in navigator) navigator.vibrate(10)
+                                      }}>
+                                        <Clock className="w-3 h-3 mr-2" />
+                                        Em 1 hora
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => {
+                                        // Quick 3h reminder
+                                        const inThreeHours = new Date(Date.now() + 3 * 60 * 60 * 1000)
+                                        const year = inThreeHours.getFullYear()
+                                        const month = String(inThreeHours.getMonth() + 1).padStart(2, '0')
+                                        const day = String(inThreeHours.getDate()).padStart(2, '0')
+                                        const hours = String(inThreeHours.getHours()).padStart(2, '0')
+                                        const mins = String(inThreeHours.getMinutes()).padStart(2, '0')
+                                        addReminder(lead.id, `${year}-${month}-${day}T${hours}:${mins}`, '')
+                                        if ('vibrate' in navigator) navigator.vibrate(10)
+                                      }}>
+                                        <Clock className="w-3 h-3 mr-2" />
+                                        Em 3 horas
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => {
+                                        // Tomorrow 9am
+                                        const tomorrow = new Date()
+                                        tomorrow.setDate(tomorrow.getDate() + 1)
+                                        tomorrow.setHours(9, 0, 0, 0)
+                                        const year = tomorrow.getFullYear()
+                                        const month = String(tomorrow.getMonth() + 1).padStart(2, '0')
+                                        const day = String(tomorrow.getDate()).padStart(2, '0')
+                                        addReminder(lead.id, `${year}-${month}-${day}T09:00`, '')
+                                        if ('vibrate' in navigator) navigator.vibrate(10)
+                                      }}>
+                                        <Calendar className="w-3 h-3 mr-2" />
+                                        Amanhã 9h
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem onClick={() => {
+                                        setReminderLead(lead)
+                                        setReminderDate('')
+                                        setReminderNote('')
+                                        setShowReminderModal(true)
+                                      }}>
+                                        <Plus className="w-3 h-3 mr-2" />
+                                        Personalizado...
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
                                 )}
                               </div>
                             </Card>
