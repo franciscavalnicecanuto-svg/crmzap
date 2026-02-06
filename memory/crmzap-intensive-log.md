@@ -497,9 +497,63 @@
 - **UX improvements**: 21+
 - **Atalhos de teclado novos**: 4 (v, u, t, r)
 
+---
+
+## Session Update: 10:20 AM
+
+### Melhorias Implementadas
+
+#### 26. ✅ UX #330 - Indicador de Dias na Coluna (dashboard/page.tsx)
+- Novo badge mostrando há quantos dias o lead está no status atual
+- Aparece apenas para leads com 5+ dias no mesmo status
+- Cores progressivas:
+  - 5-6 dias: badge âmbar (warning)
+  - 7+ dias: badge vermelho (danger)
+- Tooltip explicativo ao passar o mouse
+- Ajuda a identificar leads "esquecidos" que precisam de atenção
+
+#### 27. ✅ UX #331 - Quick Reminder Dropdown (dashboard/page.tsx)
+- Dropdown no hover do card de lead com opções rápidas:
+  - "Em 1 hora"
+  - "Em 3 horas"
+  - "Amanhã 9h"
+  - "Personalizado..." (abre modal completo)
+- Permite criar lembretes sem precisar abrir modal
+- Haptic feedback ao selecionar opção
+- Muito mais rápido para follow-ups urgentes
+
+### Arquivos Modificados
+1. `src/app/dashboard/page.tsx` (+104 linhas, -14 linhas)
+
+### Commit
+- `36ff79b` - feat(ux): add days-in-status indicator and quick reminder dropdown
+
+### Deploy
+- **URL**: https://whatszap-zeta.vercel.app
+- **Status**: ✅ Produção
+
+---
+
+## Resumo Total da Sessão (10:20 AM)
+
+### Melhorias Implementadas: 27
+1-25. (sessões anteriores)
+26. ✅ Indicador de dias na coluna
+27. ✅ Quick reminder dropdown
+
+### Commits Totais: 10
+
+### Métricas Finais
+- **Linhas adicionadas**: ~1100+
+- **Componentes novos**: 4
+- **Animações CSS novas**: 27+
+- **Bugs corrigidos**: 4
+- **UX improvements**: 23+
+- **Atalhos de teclado novos**: 4 (v, u, t, r)
+
 ### Próximas Prioridades
 1. 🎯 Swipe para mudar status (mobile)
 2. 🎯 Integrar typing indicator com Evolution API
 3. 💡 Preview de mídia inline
 4. 💡 Modo offline com queue
-5. 💡 Indicador de dias na coluna (parcialmente implementado no CSS)
+5. 💡 Filtro por "leads quentes" (atividade nas últimas 24h)
