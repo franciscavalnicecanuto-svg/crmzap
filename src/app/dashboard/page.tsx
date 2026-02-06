@@ -1545,24 +1545,6 @@ function DashboardContent() {
                   </Link>
                 )
               })()}
-              {/* UX #180: Last sync indicator */}
-              {lastSyncTime && (
-                <div className="hidden sm:flex items-center gap-1 text-[10px] text-muted-foreground mr-1" title={`Última sincronização: ${lastSyncTime.toLocaleString('pt-BR')}`}>
-                  <RefreshCw className="w-3 h-3" />
-                  <span>
-                    {(() => {
-                      const diffMs = Date.now() - lastSyncTime.getTime()
-                      const diffMins = Math.floor(diffMs / 60000)
-                      if (diffMins < 1) return 'agora'
-                      if (diffMins < 60) return `${diffMins}min`
-                      const diffHours = Math.floor(diffMins / 60)
-                      if (diffHours < 24) return `${diffHours}h`
-                      const diffDays = Math.floor(diffHours / 24)
-                      return `${diffDays}d`
-                    })()}
-                  </span>
-                </div>
-              )}
               {/* UX #268: Quick sync button */}
               {isConnected && !isSyncing && (
                 <Button 

@@ -754,6 +754,16 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
       document.removeEventListener('touchstart', handleClickOutside)
     }
   }, [contextMenuMessageId])
+  
+  // Bug fix #284: Cleanup longPressTimerRef on unmount to prevent memory leak
+  useEffect(() => {
+    return () => {
+      if (longPressTimerRef.current) {
+        clearTimeout(longPressTimerRef.current)
+        longPressTimerRef.current = null
+      }
+    }
+  }, [])
 
   // UX #158: Enhanced time formatting with relative time for recent messages
   const formatTime = (timestamp: string | null) => {
