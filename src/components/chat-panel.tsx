@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { X, Send, Loader2, Sparkles, RefreshCw, Maximize2, Minimize2, Image, FileText, Video, Mic, History, ChevronDown, ArrowLeft, Tag, Bell, MoreVertical, AlertCircle, MessageCircle, Copy, Check, Share2, MoreHorizontal } from 'lucide-react'
+import { X, Send, Loader2, Sparkles, RefreshCw, Maximize2, Minimize2, Image, FileText, Video, Mic, History, ChevronDown, ArrowLeft, Tag, Bell, MoreVertical, AlertCircle, MessageCircle, Copy, Check, Share2, MoreHorizontal, MessageSquarePlus } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
-import { TemplateButton } from '@/components/message-templates'
+import { TemplatePicker } from '@/components/message-templates'
 import { AISuggestions } from '@/components/ai-suggestions'
 import { logAction } from '@/components/action-history'
 import { ContactTypingIndicator } from '@/components/typing-indicator'
@@ -212,6 +212,7 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
   const [phoneCopied, setPhoneCopied] = useState(false) // Bug fix #271: Phone copy state
   const [conversationCopied, setConversationCopied] = useState(false) // UX #501: Copy entire conversation
   const [selectedQuickReply, setSelectedQuickReply] = useState<number | null>(null) // UX #512: Visual feedback on quick reply selection
+  const [showTemplates, setShowTemplates] = useState(false) // UX #652: Template picker controlled state
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const messagesRef = useRef<Message[]>([]) // Bug fix #14: Track messages for comparison
@@ -726,13 +727,14 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
       console.warn('Sending message while disconnected - will attempt anyway')
     }
     
-    // Bug fix #506: Validate message length before sending (WhatsApp limit ~65536 chars)
+    // Bug fix #506 + UX #803: Validate message length before sending (WhatsApp limit ~65536 chars)
+    // Show formatted number for better readability
     if (cleanedMessage.length > 65000) {
       setInputShake(true)
       setTimeout(() => setInputShake(false), 500)
       if ('vibrate' in navigator) navigator.vibrate([50, 100, 50])
-      setSendError(`Mensagem muito longa (${cleanedMessage.length}/65000 caracteres)`)
-      setTimeout(() => setSendError(null), 5000)
+      setSendError(`Mensagem muito longa (${cleanedMessage.length.toLocaleString('pt-BR')}/65.000 caracteres). Divida em partes menores.`)
+      setTimeout(() => setSendError(null), 7000) // Longer timeout for user to read
       return
     }
     
@@ -812,6 +814,21 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
       sendMessage()
     }
   }
+  
+  // UX #652: Global keyboard shortcut for templates (Ctrl+T)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+T or Cmd+T to open templates
+      if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+        e.preventDefault()
+        setShowTemplates(true)
+        if ('vibrate' in navigator) navigator.vibrate(10)
+      }
+    }
+    
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [])
 
   // UX #200: Copy individual message with visual feedback
   const copyMessage = useCallback((messageId: string, text: string) => {
@@ -1842,7 +1859,20 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
           </div>
         )}
         <div className="flex gap-2 items-end">
-          <TemplateButton onSelect={(content) => setNewMessage(content)} />
+          {/* UX #652: Controlled template picker with keyboard shortcut */}
+          <button
+            onClick={() => setShowTemplates(true)}
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
+            title="Templates rápidos (Ctrl+T)"
+          >
+            <MessageSquarePlus className="w-5 h-5 text-muted-foreground" />
+          </button>
+          {showTemplates && (
+            <TemplatePicker 
+              onSelect={(content) => setNewMessage(content)} 
+              onClose={() => setShowTemplates(false)}
+            />
+          )}
           <div className="flex-1 relative">
             <textarea
               ref={textareaRef}
@@ -1866,14 +1896,19 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
               aria-label="Campo de mensagem. Enter para enviar, Shift+Enter para nova linha"
             />
             {/* UX #68: Character counter when message is getting long */}
-            {/* UX #220: WhatsApp has ~4096 char limit - show warning near limit */}
-            {newMessage.length > 100 && !isSending && (
-              <span className={`absolute bottom-1 right-2 text-[10px] transition-colors ${
-                newMessage.length > 3500 ? 'text-red-500 font-medium' : 
-                newMessage.length > 2000 ? 'text-amber-500' : 
-                newMessage.length > 1000 ? 'text-amber-400' : 'text-muted-foreground'
-              }`}>
-                {newMessage.length}{newMessage.length > 3500 && '/4096'}
+            {/* Bug fix #801: WhatsApp real limit is ~65536 chars, not 4096 */}
+            {/* UX #802: Show counter earlier and with better thresholds */}
+            {newMessage.length > 50 && !isSending && (
+              <span className={`absolute bottom-1 right-2 text-[10px] transition-all duration-200 ${
+                newMessage.length > 60000 ? 'text-red-600 font-bold animate-pulse' : 
+                newMessage.length > 50000 ? 'text-red-500 font-medium' : 
+                newMessage.length > 30000 ? 'text-amber-500' : 
+                newMessage.length > 10000 ? 'text-amber-400' :
+                newMessage.length > 1000 ? 'text-muted-foreground' : 'text-muted-foreground/50'
+              }`}
+              title={`${newMessage.length} caracteres${newMessage.length > 50000 ? ' - próximo do limite' : ''}`}
+              >
+                {newMessage.length.toLocaleString('pt-BR')}{newMessage.length > 50000 && '/65.000'}
               </span>
             )}
           </div>
