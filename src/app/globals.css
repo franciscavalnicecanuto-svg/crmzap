@@ -945,3 +945,123 @@ button:disabled {
   padding: 0 2px;
   border-radius: 2px;
 }
+
+/* UX #256: Lead card move animation - smoother transition when changing columns */
+@keyframes lead-moved {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.7;
+    box-shadow: 0 0 0 3px oklch(0.55 0.18 145 / 0.5);
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+    box-shadow: 0 8px 25px rgba(34, 197, 94, 0.3);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+    box-shadow: none;
+  }
+}
+
+.lead-just-moved {
+  animation: lead-moved 0.5s ease-out;
+}
+
+/* UX #257: Cooling lead warning pulse */
+@keyframes cooling-pulse {
+  0%, 100% {
+    border-color: oklch(0.75 0.15 60 / 0.3);
+  }
+  50% {
+    border-color: oklch(0.75 0.15 60 / 0.7);
+    background-color: oklch(0.95 0.05 60 / 0.3);
+  }
+}
+
+.lead-cooling {
+  animation: cooling-pulse 2s ease-in-out infinite;
+  border-left: 3px solid oklch(0.75 0.15 60);
+}
+
+/* UX #258: Better button press effect for mobile */
+@media (hover: none) {
+  .btn-press:active {
+    transform: scale(0.96);
+    transition: transform 0.1s ease;
+  }
+}
+
+/* UX #259: Improved reminder snooze button hover */
+.snooze-btn {
+  transition: all 0.15s ease;
+}
+
+.snooze-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* UX #260: Drag over column highlight effect */
+.column-drag-over {
+  background: linear-gradient(
+    180deg, 
+    oklch(0.55 0.18 145 / 0.15) 0%, 
+    oklch(0.55 0.18 145 / 0.05) 50%,
+    transparent 100%
+  );
+  border-color: oklch(0.55 0.18 145 / 0.5) !important;
+  transition: all 0.2s ease;
+}
+
+/* UX #261: Urgent reminder pulsing border */
+@keyframes urgent-reminder {
+  0%, 100% {
+    border-color: oklch(0.7 0.2 35);
+    box-shadow: 0 0 0 0 oklch(0.7 0.2 35 / 0.4);
+  }
+  50% {
+    border-color: oklch(0.6 0.25 35);
+    box-shadow: 0 0 12px 2px oklch(0.7 0.2 35 / 0.3);
+  }
+}
+
+.urgent-reminder-pulse {
+  animation: urgent-reminder 1.5s ease-in-out infinite;
+}
+
+/* UX #262: Empty state icon animation */
+@keyframes empty-state-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.empty-state-icon {
+  animation: empty-state-float 3s ease-in-out infinite;
+}
+
+/* UX #263: Better card selection ring */
+.card-selected {
+  box-shadow: 
+    0 0 0 2px oklch(0.55 0.18 145),
+    0 4px 12px rgba(34, 197, 94, 0.2);
+}
+
+/* UX #264: Sync complete celebration */
+@keyframes sync-complete-flash {
+  0% {
+    background-color: oklch(0.85 0.15 145 / 0.8);
+  }
+  100% {
+    background-color: oklch(0.9 0.1 145 / 0.3);
+  }
+}
+
+.sync-complete {
+  animation: sync-complete-flash 0.5s ease-out;
+}

@@ -719,19 +719,23 @@ export default function RemindersPage() {
                       )}
                       {status === 'overdue' && (
                         <div className="flex items-center gap-1 flex-wrap">
-                          {[
-                            { label: '30m', ms: 30 * 60 * 1000, title: 'Adiar 30 minutos' },
-                            { label: '1h', ms: 60 * 60 * 1000, title: 'Adiar 1 hora' },
-                            { label: '3h', ms: 3 * 60 * 60 * 1000, title: 'Adiar 3 horas' },
-                            { label: 'Amanhã', ms: 'tomorrow' as const, title: 'Amanhã às 9h' },
-                            { label: 'Seg', ms: 'monday' as const, title: 'Segunda às 9h' },
-                          ].map((option) => (
+                          {/* Bug fix #83: Dynamic Monday label - shows "Próx. Seg" if today is Monday */}
+                          {(() => {
+                            const isMonday = new Date().getDay() === 1
+                            return [
+                              { label: '30m', ms: 30 * 60 * 1000, title: 'Adiar 30 minutos' },
+                              { label: '1h', ms: 60 * 60 * 1000, title: 'Adiar 1 hora' },
+                              { label: '3h', ms: 3 * 60 * 60 * 1000, title: 'Adiar 3 horas' },
+                              { label: 'Amanhã', ms: 'tomorrow' as const, title: 'Amanhã às 9h' },
+                              { label: isMonday ? 'Próx Seg' : 'Seg', ms: 'monday' as const, title: isMonday ? 'Próxima segunda às 9h' : 'Segunda às 9h' },
+                            ].map((option) => (
                             <Button
                               key={option.label}
                               variant="ghost"
                               size="sm"
                               className="text-amber-600 hover:text-amber-700 hover:bg-amber-50 px-2 h-7 text-xs active:scale-95 transition-transform"
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation() // Bug fix #84: Prevent card click when clicking snooze
                                 let targetDate: Date
                                 if (option.ms === 'tomorrow') {
                                   targetDate = new Date()
@@ -739,7 +743,8 @@ export default function RemindersPage() {
                                   targetDate.setHours(9, 0, 0, 0)
                                 } else if (option.ms === 'monday') {
                                   const today = new Date()
-                                  const daysUntilMonday = (8 - today.getDay()) % 7 || 7
+                                  // Bug fix #83: If today is Monday, go to NEXT Monday (7 days), not "this Monday"
+                                  const daysUntilMonday = today.getDay() === 1 ? 7 : (8 - today.getDay()) % 7 || 7
                                   targetDate = new Date(today)
                                   targetDate.setDate(today.getDate() + daysUntilMonday)
                                   targetDate.setHours(9, 0, 0, 0)
@@ -768,7 +773,8 @@ export default function RemindersPage() {
                             >
                               +{option.label}
                             </Button>
-                          ))}
+                          ))
+                          })()}
                         </div>
                       )}
                       <Button 
