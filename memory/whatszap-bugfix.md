@@ -1,5 +1,28 @@
 # WhatsZap Bug Hunt Log
 
+## 2026-02-06 01:13 - Ciclo 10
+
+**Arquivos analisados:**
+- `src/app/reminders/page.tsx` (402 linhas)
+- `src/app/dashboard/page.tsx` (2282 linhas - completo)
+- `src/components/chat-panel.tsx` (569 linhas)
+
+**Status:** ✅ 1 bug corrigido e deployado
+
+**Bug corrigido:**
+
+### Bug #50: Memory leak - setTimeout sem cleanup no load de status
+**Arquivo:** `dashboard/page.tsx` linha ~622
+**Problema:** O `setTimeout(loadStatusFromSupabase, 500)` no useEffect para carregar status do Supabase não tinha cleanup. Se o componente desmontasse antes de 500ms (navegação rápida, refresh), o timeout ainda executaria e tentaria atualizar o state de um componente desmontado.
+**Sintoma:** Warning "Can't perform a React state update on an unmounted component" em navegações rápidas.
+**Solução:** Adicionado `return () => clearTimeout(statusTimeout)` no useEffect.
+
+**Deploy:** ✅ https://whatszap-zeta.vercel.app
+
+**Nota:** Código está muito maduro (50+ bugs corrigidos). Próximos ciclos podem ser espaçados.
+
+---
+
 ## 2025-02-05 20:01 - Ciclo 9
 
 **Arquivos analisados:**
