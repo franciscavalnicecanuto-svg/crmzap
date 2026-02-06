@@ -18,7 +18,10 @@ import {
   CheckCircle,
   AlertCircle,
   ChevronRight,
-  Search
+  Search,
+  ArrowUpDown,
+  SortAsc,
+  SortDesc
 } from 'lucide-react'
 import { getUser } from '@/lib/supabase-client'
 import { SettingsNav } from '@/components/settings-nav'
@@ -54,6 +57,9 @@ export default function RemindersPage() {
   const [completingId, setCompletingId] = useState<string | null>(null) // UX: Animation state
   const [selectedIndex, setSelectedIndex] = useState(0) // UX #181: Keyboard navigation
   const searchInputRef = useRef<HTMLInputElement>(null) // UX #181: Focus search with Ctrl+K
+  // UX #523: Sort options for reminders
+  const [sortBy, setSortBy] = useState<'date' | 'name'>('date')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
 
   useEffect(() => {
     async function load() {
@@ -344,10 +350,18 @@ export default function RemindersPage() {
         break
     }
 
-    // Sort by date
-    return filtered.sort((a, b) => 
-      new Date(a.reminderDate!).getTime() - new Date(b.reminderDate!).getTime()
-    )
+    // UX #523: Sort by selected criteria
+    return filtered.sort((a, b) => {
+      let comparison = 0
+      
+      if (sortBy === 'date') {
+        comparison = new Date(a.reminderDate!).getTime() - new Date(b.reminderDate!).getTime()
+      } else if (sortBy === 'name') {
+        comparison = a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' })
+      }
+      
+      return sortDirection === 'asc' ? comparison : -comparison
+    })
   }
 
   const filteredLeads = getFilteredLeads()
@@ -551,24 +565,70 @@ export default function RemindersPage() {
         )}
 
         {/* Search - UX #181: Added keyboard shortcut hint */}
-        <div className="mb-4 relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input 
-            ref={searchInputRef}
-            placeholder="Buscar por nome, telefone ou nota... (Ctrl+K)"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 pr-8"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center"
-              title="Limpar (Escape)"
+        {/* UX #523: Added sort controls */}
+        <div className="mb-4 flex flex-col sm:flex-row gap-2 sm:items-center">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input 
+              ref={searchInputRef}
+              placeholder="Buscar por nome, telefone ou nota... (Ctrl+K)"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 pr-8"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-muted hover:bg-muted-foreground/20 flex items-center justify-center"
+                title="Limpar (Escape)"
+              >
+                <X className="w-3 h-3 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+          {/* Sort controls */}
+          <div className="flex items-center gap-1">
+            <Button
+              variant={sortBy === 'date' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 px-2 text-xs"
+              onClick={() => {
+                if (sortBy === 'date') {
+                  setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+                } else {
+                  setSortBy('date')
+                  setSortDirection('asc')
+                }
+              }}
+              title="Ordenar por data"
             >
-              <X className="w-3 h-3 text-muted-foreground" />
-            </button>
-          )}
+              <Clock className="w-3 h-3 mr-1" />
+              Data
+              {sortBy === 'date' && (
+                sortDirection === 'asc' ? <SortAsc className="w-3 h-3 ml-1" /> : <SortDesc className="w-3 h-3 ml-1" />
+              )}
+            </Button>
+            <Button
+              variant={sortBy === 'name' ? 'secondary' : 'ghost'}
+              size="sm"
+              className="h-8 px-2 text-xs"
+              onClick={() => {
+                if (sortBy === 'name') {
+                  setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')
+                } else {
+                  setSortBy('name')
+                  setSortDirection('asc')
+                }
+              }}
+              title="Ordenar por nome"
+            >
+              <User className="w-3 h-3 mr-1" />
+              Nome
+              {sortBy === 'name' && (
+                sortDirection === 'asc' ? <SortAsc className="w-3 h-3 ml-1" /> : <SortDesc className="w-3 h-3 ml-1" />
+              )}
+            </Button>
+          </div>
         </div>
         
         {/* UX #181: Keyboard shortcuts hint */}
