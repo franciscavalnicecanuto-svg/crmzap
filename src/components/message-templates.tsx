@@ -364,12 +364,29 @@ export function TemplatePicker({ onSelect, onClose }: TemplatePickerProps) {
                 className="h-8 text-sm transition-colors"
                 autoFocus
               />
-              <textarea
-                placeholder="Conteúdo da mensagem...&#10;Dica: Use [NOME], [VALOR], etc. como placeholders"
-                value={newContent}
-                onChange={(e) => setNewContent(e.target.value)}
-                className="w-full h-24 px-3 py-2 text-sm border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-[#25D366] transition-shadow"
-              />
+              {/* Bug fix #143: Template content with character limit indicator */}
+              <div className="relative">
+                <textarea
+                  placeholder="Conteúdo da mensagem...&#10;Dica: Use [NOME], [VALOR], etc. como placeholders"
+                  value={newContent}
+                  onChange={(e) => {
+                    // Limit to 1000 characters
+                    if (e.target.value.length <= 1000) {
+                      setNewContent(e.target.value)
+                    }
+                  }}
+                  className={`w-full h-24 px-3 py-2 text-sm border rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-[#25D366] transition-shadow ${
+                    newContent.length > 900 ? 'border-amber-400' : ''
+                  } ${newContent.length >= 1000 ? 'border-red-400' : ''}`}
+                />
+                <span className={`absolute bottom-2 right-2 text-[10px] ${
+                  newContent.length >= 1000 ? 'text-red-500 font-medium' :
+                  newContent.length > 900 ? 'text-amber-500' :
+                  newContent.length > 500 ? 'text-muted-foreground' : 'text-muted-foreground/50'
+                }`}>
+                  {newContent.length}/1000
+                </span>
+              </div>
               <div className="flex gap-2">
                 <Button
                   variant="ghost"
