@@ -1044,6 +1044,10 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
                         return lastMsgTs.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
                       })()}
                     </span>
+                    {/* UX #511: Message count indicator */}
+                    <span className="text-[9px] opacity-40" title={`${messages.length} mensagens na conversa`}>
+                      · {messages.length} msg{messages.length !== 1 ? 's' : ''}
+                    </span>
                   </>
                 )
               })()}

@@ -1848,6 +1848,32 @@ function DashboardContent() {
           </div>
         )}
 
+        {/* UX #510: Floating sync progress bar */}
+        {isSyncing && (
+          <div className="fixed top-14 left-0 right-0 z-50 px-4 animate-in slide-in-from-top-2 duration-200">
+            <div className="max-w-lg mx-auto bg-gradient-to-r from-green-500 to-emerald-500 rounded-b-xl shadow-lg px-4 py-2.5">
+              <div className="flex items-center gap-3">
+                <div className="relative w-5 h-5">
+                  <div className="absolute inset-0 rounded-full border-2 border-white/30" />
+                  <div className="absolute inset-0 rounded-full border-2 border-transparent border-t-white animate-spin" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-white text-xs font-medium">Sincronizando mensagens...</span>
+                    <span className="text-white/80 text-xs">{Math.round(syncProgress)}%</span>
+                  </div>
+                  <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-white rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${syncProgress}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* UX #179: Cooling Leads Alert - leads without contact for 3+ days */}
         {coolingLeads.length > 0 && !pendingReminders.length && (
           <div className="bg-blue-500/10 border-b border-blue-500/20 px-3 py-2 animate-in slide-in-from-top-1 duration-200">
