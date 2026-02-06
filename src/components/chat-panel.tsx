@@ -1301,8 +1301,35 @@ export function ChatPanel({ lead, onClose, isConnected = true, onTagsUpdate, onO
       )}
       <div className="p-3 border-t">
         {sendError && (
-          <div className="mb-2 px-2 py-1 bg-red-50 border border-red-200 rounded text-xs text-red-600 animate-in fade-in-0 duration-200">
-            {sendError}
+          <div className="mb-2 px-2 py-1.5 bg-red-50 border border-red-200 rounded text-xs text-red-600 animate-in fade-in-0 slide-in-from-bottom-1 duration-200 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>{sendError}</span>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {newMessage.trim() && (
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(newMessage)
+                    if ('vibrate' in navigator) navigator.vibrate(10)
+                  }}
+                  className="px-1.5 py-0.5 bg-red-100 hover:bg-red-200 rounded text-[10px] font-medium transition"
+                  title="Copiar mensagem"
+                >
+                  Copiar
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setSendError(null)
+                  sendMessage()
+                }}
+                className="px-1.5 py-0.5 bg-red-100 hover:bg-red-200 rounded text-[10px] font-medium transition"
+                title="Tentar enviar novamente"
+              >
+                Tentar novamente
+              </button>
+            </div>
           </div>
         )}
         {/* UX #84: Sending indicator above input */}
