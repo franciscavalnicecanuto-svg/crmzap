@@ -1,328 +1,40 @@
-# CRMZap - Log de Melhoria Intensiva
-
-## 2026-02-06 04:43 - Sessão Intensiva #5
-
-### 🎯 Resumo
-Melhorias focadas em produtividade do usuário: atalhos de teclado, exportação de dados e UX de copiar informações.
-
----
-
-## ✅ Melhorias Implementadas (Sessão #5)
-
-### 1. Keyboard Shortcuts Modal (NEW: keyboard-shortcuts.tsx)
-**UX Improvements:**
-- **#153**: Modal de ajuda com todos os atalhos de teclado
-  - Ativado pressionando `?` em qualquer tela
-  - Grupos organizados: Navegação, Chat, Templates, Ações
-  - Design moderno com ícones de teclas
-  - Fecha com ESC ou clique fora
-  - Integrado ao Dashboard
-
-### 2. Chat Panel (chat-panel.tsx)
-**UX Improvements:**
-- **#155**: Copiar número de telefone com 1 clique
-  - Número é clicável (mostra "Clique para copiar")
-  - Ícone de cópia aparece no hover
-  - Haptic feedback ao copiar
-  - Remove formatação (copia só dígitos)
-
-### 3. Reports Page (reports/page.tsx)
-**Feature Improvements:**
-- **#156**: Exportar para CSV além de PDF
-  - Dropdown "Exportar" com opções PDF e CSV
-  - CSV com BOM para UTF-8 no Excel
-  - Campos: Nome, Telefone, Status, Valor, Tags, Criado, Lembrete
-- **#157**: Melhor feedback de erro
-  - Toast-like messages (não mais alert())
-  - Animação slide-in-from-bottom
-
-### 4. Safe Storage Utilities (NEW: safe-storage.ts)
-**Bug Fixes:**
-- **#154**: Tratamento de localStorage quota exceeded
-  - `safeGetItem` / `safeSetItem` com fallbacks
-  - Cleanup automático de dados antigos
-  - Estatísticas de uso do storage
-  - Compressão de dados removendo campos vazios
-
----
-
-## 📊 Commits
-
-1. `feat(ux): add keyboard shortcuts modal, copy phone, CSV export, safe storage`
-   - 8 arquivos alterados
-   - UX #153, #155, #156, #157
-   - Bug fix #154
-   - 2 novos arquivos criados
-
----
-
-## 🚀 Deploy
-
-**URL:** https://whatszap-zeta.vercel.app
-**Status:** ✅ Deployed
-**Timestamp:** 2026-02-06 04:55
-
----
-
-## 2026-02-06 04:24 - Sessão Intensiva #4
-
-### 🎯 Resumo
-Melhorias focadas em validação de formulários, UX de conexão e modais customizados.
-
----
-
-## ✅ Melhorias Implementadas (Sessão #4)
-
-### 1. Subscription Page (subscription/page.tsx)
-**UX Improvements:**
-- **#150**: Modal customizado para upgrade (substituiu `alert()` nativo)
-  - Design moderno com gradiente e ícone Sparkles
-  - Botões de contato via WhatsApp e Email
-  - Backdrop blur e animações suaves
-  - Fechar com ESC ou clique fora
-
-### 2. Connect Page (connect/page.tsx)
-**UX Improvements:**
-- **#151**: Verificação manual de conexão
-  - Botão "Já escaneei" para verificar conexão manualmente
-  - Contador de tentativas com dicas contextuais
-  - Dicas progressivas: "Verificando..." → "Aguarde sincronizar..." → "Feche e abra o WhatsApp"
-  - Haptic feedback em mobile
-
-### 3. Login Page (login/page.tsx)
-**Bug Fixes + UX:**
-- **#152**: Validação em tempo real de campos
-  - Email: validação de formato no blur
-  - Senha: mínimo 6 caracteres
-  - Visual feedback (bordas vermelhas, ícones)
-  - Aria attributes para acessibilidade
-  - Limpa erros ao digitar
-- Mensagens de erro em português
-  - "Invalid login credentials" → "Email ou senha incorretos"
-  - "Email not confirmed" → "Confirme seu email antes de entrar"
-  - "Too many requests" → "Muitas tentativas. Aguarde um momento."
-- Haptic feedback em erro/sucesso
-
----
-
-## 📊 Commits
-
-1. `feat(ux): improve subscription modal, connect page, and login validation`
-   - 3 arquivos alterados (subscription, connect, login)
-   - UX #150, #151
-   - Bug fix #152
-
----
-
-## 🚀 Deploy
-
-**URL:** https://whatszap-zeta.vercel.app
-**Status:** ✅ Deployed
-**Timestamp:** 2026-02-06 04:30
-
----
-
-## 2026-02-06 00:40 - Sessão Intensiva #3
-
-### 🎯 Resumo
-Melhorias focadas em UX de lembretes, feedback de chat e correções de bugs.
-
----
-
-## ✅ Melhorias Implementadas (Sessão #3)
-
-### 1. Profile Page (profile/page.tsx)
-**UX Improvements:**
-- **#79**: Modal de confirmação customizado para exclusão de conta (substituiu `confirm()` nativo)
-- Loading indicator durante deleção de conta
-- Animações de entrada/saída no modal
-
-### 2. Reminders Page (reminders/page.tsx)
-**UX Improvements:**
-- **#82**: Mais opções de snooze para lembretes atrasados:
-  - +1h, +3h (já existiam)
-  - +Amanhã (9h da manhã seguinte)
-  - +Seg (segunda-feira 9h)
-- Haptic feedback nos botões de snooze
-
-### 3. Dashboard (dashboard/page.tsx)
-**UX Improvements:**
-- **#85**: Indicador visual de urgência nos lembretes:
-  - Atrasado: ícone vermelho pulsante + tooltip vermelho
-  - Urgente (<2h): ícone laranja com bounce
-  - Próximo (<24h): ícone âmbar
-  - Normal: ícone âmbar claro
-- Contador regressivo no tooltip ("em 30min", "2h atrás")
-
-### 4. Chat Panel (chat-panel.tsx)
-**UX Improvements:**
-- **#84**: Indicador "Enviando mensagem..." visível acima do input
-- Textarea muda cor de fundo durante envio
-- Botão de enviar com estado visual diferenciado
-
-### 5. Reports Page (reports/page.tsx)
-**Bug Fixes:**
-- **#81**: Safe date parsing com `parseSafeDate()` para tratar `createdAt` undefined
-- Previne NaN em cálculos de comparação mensal
-
-### 6. Settings Page (settings/page.tsx)
-**Bug Fixes:**
-- **#83**: Validação de input para meta mensal:
-  - Não permite valores negativos
-  - Não permite NaN
-  - Auto-corrige para 10000 ao perder foco com valor inválido
-  - Atributos `min="0"` e `step="100"` no input
-
----
-
-## 📊 Commits
-
-1. `feat(ux): improve reminders, chat feedback, and fix date handling`
-   - 6 arquivos alterados (dashboard, profile, reminders, reports, settings, chat-panel)
-   - UX #79, #82, #84, #85
-   - Bug fixes #81, #83
-
----
-
-## 🚀 Deploy
-
-**URL:** https://whatszap-zeta.vercel.app
-**Status:** ✅ Deployed
-**Timestamp:** 2026-02-06 00:40
-
----
-
-## 2025-02-06 00:32 - Sessão Intensiva #2
-
-### 🎯 Resumo
-Continuação das melhorias com foco em UX de lembretes e chat.
-
----
-
-## ✅ Melhorias Implementadas (Sessão #2)
-
-### 1. Dashboard - Lembretes (dashboard/page.tsx)
-**UX Improvements:**
-- **#75**: Quick Snooze buttons no modal de lembrete (15min, 1h, 3h, Amanhã 9h)
-- Haptic feedback ao clicar nos botões de atalho
-
-**Bug Fixes:**
-- **#73**: `getRelativeTime` agora trata datas futuras graciosamente (clock skew, timezone)
-- **#74**: `kanbanColumns` localStorage com validação de estrutura + fallback para defaults
-- **#76**: `datetime-local min` recalculado em cada render (não mais estático)
-
-### 2. Chat Panel (chat-panel.tsx)
-**UX Improvements:**
-- **#77**: Mensagens agrupadas por data com separadores visuais ("Hoje", "Ontem", "DD/MM")
-- Melhora significativa na leitura de conversas longas
-
-### 3. Reminders Page (reminders/page.tsx)
-**UX Improvements:**
-- **#78**: Botões de snooze rápido (+1h, +3h) para lembretes atrasados
-
----
-
-## 📊 Commits
-
-1. `feat(ux): add quick snooze, date grouping, and bug fixes`
-   - 3 arquivos alterados (dashboard, chat-panel, reminders)
-   - UX #75-78, Bug fixes #73-74, #76
-
----
-
-## 🚀 Deploy
-
-**URL:** https://whatszap-zeta.vercel.app
-**Status:** ✅ Deployed
-**Timestamp:** 2025-02-06 00:45
-
----
-
-## 2025-02-06 00:10 - Sessão Intensiva #1
-
-### 🎯 Resumo
-Sessão de 10 horas focada em UX, bugs e features.
-
----
-
-## ✅ Melhorias Implementadas
-
-### 1. Templates de Mensagem (message-templates.tsx)
-**UX Improvements:**
-- **#55**: Edição de templates existentes (antes só criava/deletava)
-- **#56**: Confirmação inline antes de deletar template
-- **#57**: Tratamento de localStorage corrompido
-- **#58**: Fechar modal com ESC (cascata)
-- **#59**: Botão para restaurar templates padrão
-- **#60**: Validação de nomes duplicados com animação shake
-
-**Detalhes:**
-- Focus automático no campo de busca ao abrir
-- Haptic feedback em mobile (copy/delete)
-- Textarea maior com dica de placeholders
-- Animações de entrada/saída suaves
-
-### 2. Sugestões de IA (ai-suggestions.tsx)
-**UX Improvements:**
-- **#61**: Skeleton loading ao invés de texto spinner
-- **#62**: Mostrar erros com opção de retry
-- **#63**: Painel colapsável (botão minimizar)
-- **#66**: Haptic feedback ao clicar em sugestão
-
-**Bug Fixes:**
-- **#64**: Limitar mensagens enviadas à API (últimas 20)
-- **#65**: AbortController para cancelar requests pendentes
-- Tratamento de rate limiting (429)
-
-### 3. Input de Chat (chat-panel.tsx)
-**UX Improvements:**
-- **#67**: Converter para textarea multilinha com auto-resize
-- **#68**: Contador de caracteres para mensagens longas (>100)
-- Placeholder melhorado com dica de atalhos (Enter/Shift+Enter)
-- Altura máxima de 128px para não ocupar tela toda
-
-### 4. CSS Global (globals.css)
-- Animação `shake` para feedback de validação
-- Classe utilitária `scrollbar-hide` para scrollbars ocultos
-
----
-
-## 📊 Commits
-
-1. `feat(templates): add edit functionality and delete confirmation`
-   - 21 arquivos alterados
-   - UX #55-60
-
-2. `feat(ux): improve AI suggestions, chat input, and templates`
-   - 1 arquivo alterado
-   - UX #61-68
-
----
-
-## 🚀 Deploy
-
-**URL:** https://whatszap-zeta.vercel.app
-**Status:** ✅ Deployed
-**Timestamp:** 2025-02-06 00:30
-
----
-
-## 📝 Próximas Melhorias Sugeridas
-
-1. **Cache local de sugestões IA** - Evitar chamadas repetidas para mesma conversa
-2. **Drag & drop de arquivos** no chat para enviar mídia
-3. **Pesquisa global** em todas as conversas
-4. **Atalhos de teclado** documentados (help modal)
-5. **Modo offline** com service worker melhorado
-6. **Notificações push** nativas (além do browser notification)
-
----
-
-## 🐛 Bugs Conhecidos (não críticos)
-
-1. `min` do datetime-local é estático (se modal fica aberto muito tempo, min fica desatualizado)
-2. localStorage muito grande pode causar lentidão na primeira carga
-
----
-
-*Atualizado: 2026-02-06 00:40*
+# CRMZap Intensive Improvement Log
+
+## Session: 2026-02-06 05:05 AM
+
+### Melhorias Implementadas
+
+#### 1. ✅ UX - Página de Lembretes (reminders/page.tsx)
+- **Histórico de Completos**: Nova aba "Feitos (7d)" mostra lembretes completados nos últimos 7 dias
+- **Estatísticas Expandidas**: Grid agora tem 5 colunas incluindo contagem de completados
+- **Animação de Conclusão**: Quando marca como feito, o card faz fade + slide out animado
+- **Armazenamento**: Histórico de até 50 lembretes completados salvos no localStorage
+
+#### 2. ✅ UX - Dashboard (dashboard/page.tsx)
+- **Barra de Progresso do Sync**: Substituído toast simples por barra visual com porcentagem
+- **Busca de Telefone Melhorada**: Agora aceita:
+  - Número completo: "5511999990000"
+  - Parcial: "999990000"
+  - Últimos 8 dígitos: "99990000" (padrão brasileiro)
+  - Parcial dentro dos últimos 8: "9999"
+
+#### 3. ✅ CSS - Animações (globals.css)
+- `reminder-completing`: Animação de slide-out para lembretes completados
+- `sync-progress-bar`: Animação para barra de progresso
+- Melhor scroll em mobile para kanban
+
+### Arquivos Modificados
+1. `src/app/reminders/page.tsx` (+122 linhas)
+2. `src/app/dashboard/page.tsx` (+47 linhas)
+3. `src/app/globals.css` (+50 linhas)
+
+### Deploy
+- **Commit**: `1beb45d` - "feat(ux): intensive improvements batch"
+- **URL**: https://whatszap-zeta.vercel.app
+- **Status**: ✅ Produção
+
+### Próximas Melhorias Sugeridas
+- [ ] Adicionar swipe para mudar status de lead no mobile
+- [ ] Melhorar indicador de typing no chat
+- [ ] Adicionar atalhos de teclado para navegação entre colunas
+- [ ] Implementar modo offline com queue de mensagens

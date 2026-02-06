@@ -1784,6 +1784,19 @@ function DashboardContent() {
                                         {lead.unreadCount! > 9 ? '9+' : lead.unreadCount}
                                       </span>
                                     )}
+                                    {/* UX: "Novo" badge for leads created in last 24h */}
+                                    {!settings.compactView && lead.createdAt && (() => {
+                                      const created = new Date(lead.createdAt)
+                                      const hoursSinceCreated = (Date.now() - created.getTime()) / 3600000
+                                      if (hoursSinceCreated <= 24) {
+                                        return (
+                                          <span className="text-[7px] px-1 py-0.5 bg-blue-500 text-white rounded-full font-medium" title={`Criado ${hoursSinceCreated < 1 ? 'agora' : `há ${Math.floor(hoursSinceCreated)}h`}`}>
+                                            NOVO
+                                          </span>
+                                        )
+                                      }
+                                      return null
+                                    })()}
                                     {/* UX #85: Enhanced reminder indicator with urgency levels */}
                                     {lead.reminderDate && (() => {
                                       const reminderTime = new Date(lead.reminderDate).getTime()
